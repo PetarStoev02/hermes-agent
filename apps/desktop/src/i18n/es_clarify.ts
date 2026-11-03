@@ -11,6 +11,8 @@ export const esClarify: Partial<ClarifyCopy> = {
   skipped: 'Omitido',
   noAnswer: 'Sin respuesta',
   confirmAndContinueLabel: 'Confirmar y continuar',
+  back: 'Atrás',
+  next: 'Siguiente',
   singleSelectHint: 'Elige una',
   multiSelectHint: 'Elige todas las que correspondan',
   oneQuestion: '1 pregunta',

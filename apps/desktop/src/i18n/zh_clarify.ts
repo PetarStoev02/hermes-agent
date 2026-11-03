@@ -11,6 +11,8 @@ export const zhClarify: Partial<ClarifyCopy> = {
   skipped: '已跳过',
   noAnswer: '未回答',
   confirmAndContinueLabel: '确认并继续',
+  back: '返回',
+  next: '下一步',
   singleSelectHint: '选一个',
   multiSelectHint: '可多选',
   oneQuestion: '1 个问题',

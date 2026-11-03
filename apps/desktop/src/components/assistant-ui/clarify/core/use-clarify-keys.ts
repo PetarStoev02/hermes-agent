@@ -60,11 +60,16 @@ export function useClarifyKeys({
     (index: number) => {
       onOtherFocus(index)
 
-      const block = formRef.current?.querySelectorAll<HTMLElement>('[data-clarify-batch-question]')[index]
+      // Pager mounts one question at a time — look up by qid, not DOM index.
+      const qid = questions[index]?.qid
+
+      const block = qid
+        ? formRef.current?.querySelector<HTMLElement>(`[data-clarify-batch-question="${CSS.escape(qid)}"]`)
+        : null
 
       block?.querySelector<HTMLTextAreaElement>('textarea')?.focus()
     },
-    [formRef, onOtherFocus]
+    [formRef, onOtherFocus, questions]
   )
 
   // A multi-select is never "open": zero picks is a valid answer ("pick any"). Counting it
@@ -101,7 +106,13 @@ export function useClarifyKeys({
 
       onToggle(question, choice)
 
-      const next = question.multiSelect ? null : nextUnstaged(index)
+      if (question.multiSelect) {
+        setCursor({ question: index, row: choiceIndex })
+
+        return
+      }
+
+      const next = nextUnstaged(index)
 
       if (next !== null && !questions[next]?.choices?.length) {
         focusOther(next)
@@ -109,7 +120,15 @@ export function useClarifyKeys({
         return
       }
 
-      setCursor(next === null ? { question: index, row: choiceIndex } : { question: next, row: 0 })
+      if (next !== null) {
+        setCursor({ question: next, row: 0 })
+
+        return
+      }
+
+      // Nothing left open — land on the last page so Confirm is reachable
+      // (a pick on an earlier page used to leave the pager stranded mid-set).
+      setCursor({ question: Math.max(questions.length - 1, 0), row: 0 })
     },
     [focusOther, nextUnstaged, onToggle, questions]
   )

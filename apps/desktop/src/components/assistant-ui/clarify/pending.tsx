@@ -6,9 +6,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Loader } from '@/components/ui/loader'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
-import { MessageQuestion } from '@/lib/icons'
 import {
-  bareChoice,
   type ClarifyQuestion,
   type ClarifyRequest,
   clearClarifyRequest,
@@ -20,21 +18,20 @@ import { notifyError } from '@/store/notifications'
 import { forgetServerRequest } from '@/store/server-requests'
 import { requestForOwnedSession } from '@/store/session-states'
 
-import { ClarifyConfirmBar } from './core/confirm-bar'
-import { emptyStage, QuestionBlock } from './core/question-block'
-import { CLARIFY_ICON_CLASS, ClarifyShell } from './core/shell'
+import { emptyStage } from './core/question-block'
+import { ClarifyShell } from './core/shell'
 import { useClarifyKeys } from './core/use-clarify-keys'
 import type { ClarifyArgs } from './parse'
-import { handleClarifySubmitShortcut } from './submit-shortcut'
-import { UndeliveredNotice } from './undelivered-notice'
+import { ClarifyPendingForm } from './pending-form'
+import { type ClarifyStage, mergeLockedAnswers, stagedAnswerFrom } from './pending-stage'
 
-/** Live batch card: all questions at once, staged locally, ONE confirm.
- * Picks and drafts stay in component state — nothing reaches the server
- * until the user presses the single
- * "Confirm and continue" button, which sends the per-question locks
- * back-to-back and completes the batch. Staged answers stay editable up to
- * that moment. The per-question wire protocol is unchanged (the TUI/CLI
- * still lock incrementally); this card just batches its locks at the end. */
+/** Live batch card: one question at a time (Back/Next pager), staged locally,
+ * ONE confirm on the last page. Picks and drafts stay in component state —
+ * nothing reaches the server until the user presses "Confirm and continue",
+ * which sends the per-question locks back-to-back and completes the batch.
+ * Staged answers stay editable up to that moment. The per-question wire
+ * protocol is unchanged (the TUI/CLI still lock incrementally); this card
+ * just batches its locks at the end. */
 export function ClarifyToolPending({
   fromArgs,
   onAnswered,
@@ -74,7 +71,7 @@ export function ClarifyToolPending({
 
   const questions = ready ? liveQuestions : previewQuestions
 
-  const [staged, setStaged] = useState<Record<string, { choices: string[]; draft: string }>>({})
+  const [staged, setStaged] = useState<Record<string, ClarifyStage>>({})
   const [submitting, setSubmitting] = useState(false)
 
   // Locked answers (a reconnect replay, or text typed in the composer) stage
@@ -107,64 +104,12 @@ export function ClarifyToolPending({
     }
 
     setSeenLocks(lockedAnswers)
-
-    setStaged(current => {
-      const next = { ...current }
-
-      for (const question of questions) {
-        const answer = lockedAnswers[question.qid]
-
-        if (answer === undefined || answer === null || seenLocks[question.qid] === answer) {
-          continue
-        }
-
-        const options = question.choices ?? []
-        let replayedAnswers = [answer]
-
-        if (question.multiSelect) {
-          try {
-            const parsed = JSON.parse(answer)
-
-            if (Array.isArray(parsed) && parsed.every(value => typeof value === 'string')) {
-              replayedAnswers = parsed
-            }
-          } catch {
-            // Older/non-JSON replies remain a one-value replay below.
-          }
-        }
-
-        const matchedChoices = options.filter(choice => replayedAnswers.includes(bareChoice(choice)))
-        // Words that name no choice (typed in the composer) go to the free-text field as words, not JSON.
-        const draft = replayedAnswers.filter(value => !options.some(choice => bareChoice(choice) === value)).join(', ')
-        next[question.qid] = { choices: matchedChoices, draft }
-      }
-
-      return next
-    })
+    setStaged(current => mergeLockedAnswers(current, questions, lockedAnswers, seenLocks))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by the replay map only
   }, [request?.lockedAnswers])
 
-  const stageFor = (qid: string) => staged[qid] ?? emptyStage
-
   const stagedAnswer = useCallback(
-    (question: ClarifyQuestion): string | null => {
-      const stage = staged[question.qid] ?? emptyStage
-      const draft = stage.draft.trim()
-
-      if (question.multiSelect) {
-        // The typed text is an additional answer, not a replacement for the
-        // staged choices.
-        const combined = [...stage.choices.map(bareChoice), ...(draft ? [draft] : [])]
-
-        return combined.length > 0 ? JSON.stringify(combined) : null
-      }
-
-      if (stage.choices.length > 0) {
-        return bareChoice(stage.choices[0])
-      }
-
-      return draft ? draft : null
-    },
+    (question: ClarifyQuestion) => stagedAnswerFrom(question, staged),
     [staged]
   )
 
@@ -283,8 +228,22 @@ export function ClarifyToolPending({
   })
 
   const disabled = submitting || !ready
+  // Keyboard cursor owns the pager page so a pick that advances to the next
+  // open question also flips the visible card (Back/Next call focusQuestion).
+  const page = Math.min(Math.max(keys.activeQuestion, 0), Math.max(questions.length - 1, 0))
+  const visibleQuestion = questions[page]
+  const paged = questions.length > 1
 
-  if (questions.length === 0) {
+  // New live request: start the pager on question 0 (cursor survives remounts
+  // of the same tool row across one-card-per-question gateway prompts).
+  useEffect(() => {
+    if (request?.requestId) {
+      keys.focusQuestion(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when the live request id changes
+  }, [request?.requestId])
+
+  if (questions.length === 0 || !visibleQuestion) {
     return (
       <ClarifyShell aria-label={copy.loadingQuestion} className="my-1.5 grid min-h-12 place-items-center" role="status">
         <Loader aria-hidden="true" className="size-6 text-(--ui-text-tertiary)" role="presentation" type="rose-curve" />
@@ -292,53 +251,32 @@ export function ClarifyToolPending({
     )
   }
 
-  return (
-    <form
-      aria-busy={ready || undelivered ? undefined : 'true'}
-      className="my-1.5 grid gap-4"
-      data-clarify-batch={questions.length}
-      data-clarify-batch-preview={ready ? undefined : ''}
-      data-clarify-choices={ready ? questions[keys.activeQuestion]?.choices?.length || undefined : undefined}
-      onKeyDownCapture={handleClarifySubmitShortcut}
-      onSubmit={handleSubmit}
-      ref={formRef}
-    >
-      {ready || undelivered ? null : (
-        <span className="sr-only" role="status">
-          {copy.loadingQuestion}
-        </span>
-      )}
-      <ClarifyShell className="grid gap-3">
-        <div className="flex items-start gap-2">
-          <span className="flex-1 text-[0.6875rem] leading-4 text-(--ui-text-tertiary)">
-            {questions.length === 1 ? copy.oneQuestion : copy.questionProgress(answeredCount, questions.length)}
-          </span>
-          <MessageQuestion aria-hidden className={CLARIFY_ICON_CLASS} />
-        </div>
-        {undelivered ? <UndeliveredNotice /> : null}
-        {questions.map((question, index) => (
-          <QuestionBlock
-            cursor={ready && keys.activeQuestion === index ? keys.cursorRow : null}
-            disabled={disabled}
-            key={question.qid}
-            onActivate={() => keys.focusQuestion(index)}
-            onDraft={value => draftFor(question, value)}
-            onOtherFocus={() => keys.onOtherFocus(index)}
-            onPick={choiceIndex => keys.pick(index, choiceIndex)}
-            question={question}
-            staged={stageFor(question.qid)}
-          />
-        ))}
-      </ClarifyShell>
+  const active = visibleQuestion
 
-      {undelivered ? null : (
-        <ClarifyConfirmBar
-          canConfirm={canConfirm}
-          disabled={disabled}
-          onSkip={() => void cancelAll()}
-          submitting={submitting}
-        />
-      )}
-    </form>
+  return (
+    <ClarifyPendingForm
+      answeredCount={answeredCount}
+      canConfirm={canConfirm}
+      copy={copy}
+      cursorRow={ready ? keys.cursorRow : null}
+      disabled={disabled}
+      formRef={formRef}
+      onActivate={() => keys.focusQuestion(page)}
+      onBack={() => keys.focusQuestion(Math.max(0, page - 1))}
+      onDraft={value => draftFor(active, value)}
+      onNext={() => keys.focusQuestion(Math.min(questions.length - 1, page + 1))}
+      onOtherFocus={() => keys.onOtherFocus(page)}
+      onPick={choiceIndex => keys.pick(page, choiceIndex)}
+      onSkip={() => void cancelAll()}
+      onSubmit={handleSubmit}
+      page={page}
+      paged={paged}
+      questions={questions}
+      ready={ready}
+      staged={staged}
+      submitting={submitting}
+      undelivered={undelivered}
+      visibleQuestion={active}
+    />
   )
 }

@@ -58,29 +58,60 @@ function renderSet(questions = QUESTIONS) {
 const locks = (request: ReturnType<typeof vi.fn>) =>
   request.mock.calls.filter(call => call[0] === 'clarify.lock').map(call => [call[1].question_id, call[1].answer])
 
-describe('a multi-question clarify set is one form', () => {
-  it('shows every question at once with one submit', () => {
+const goNext = () => fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+const goBack = () => fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+describe('a multi-question clarify set is one paged form', () => {
+  it('shows one question at a time with Next, then Confirm on the last page', () => {
     renderSet()
 
-    for (const { question } of QUESTIONS) { expect(screen.getByText(question)).toBeTruthy() }
+    expect(screen.getByText('Which target?')).toBeTruthy()
+    expect(screen.queryByText('Which region?')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Confirm and continue/ })).toBeNull()
 
-    expect(screen.getAllByRole('button', { name: /Confirm and continue/ })).toHaveLength(1)
+    goNext()
+    expect(screen.getByText('Which region?')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy()
+
+    goNext()
+    expect(screen.getByText('Anything else?')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Confirm and continue/ })).toBeTruthy()
+  })
+
+  it('picking an answer advances to the next open question', async () => {
+    const request = renderSet()
+
+    fireEvent.click(screen.getByRole('button', { name: /staging/ }))
+    expect(screen.getByText('Which region?')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /us/ }))
+    expect(screen.getByText('Anything else?')).toBeTruthy()
+
+    fireEvent.change(screen.getByPlaceholderText(/Type your answer/), { target: { value: 'after 5pm' } })
+    fireEvent.click(screen.getByRole('button', { name: /Confirm and continue/ }))
+    await waitFor(() => expect(locks(request)).toHaveLength(3))
+    expect(locks(request)).toEqual([['q0', 'staging'], ['q1', 'us'], ['q2', 'after 5pm']])
   })
 
   it('plain Enter on an answered earlier question moves on instead of sending the set half answered', async () => {
     const request = renderSet()
 
-    // Picking moves the cursor to the next open question; the user goes back to the answered one.
     fireEvent.click(screen.getByRole('button', { name: /staging/ }))
-    fireEvent.pointerDown(screen.getByText('Which target?'))
+    expect(screen.getByText('Which region?')).toBeTruthy()
+
+    goBack()
+    expect(screen.getByText('Which target?')).toBeTruthy()
+
     // Enter on that answered row must not submit while two questions are still open: it moves on.
     fireEvent.keyDown(window, { key: 'Enter' })
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(locks(request)).toEqual([])
-    // The cursor is on the next question now: Enter picks its highlighted row.
-    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByText('Which region?')).toBeTruthy()
 
-    // Answering the rest and pressing Enter on the last question sends the whole set once.
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByText('Anything else?')).toBeTruthy()
+
     fireEvent.change(screen.getByPlaceholderText(/Type your answer/), { target: { value: 'after 5pm' } })
     fireEvent.keyDown(screen.getByPlaceholderText(/Type your answer/), { key: 'Enter', ctrlKey: true })
     await waitFor(() => expect(locks(request)).toHaveLength(3))
@@ -90,53 +121,43 @@ describe('a multi-question clarify set is one form', () => {
   it('plain Enter on the last question does not send the set while earlier questions are open', async () => {
     const request = renderSet([...QUESTIONS.slice(0, 2), { ...QUESTIONS[2], choices: ['now', 'later'] }])
 
-    // Only the last question is answered; the user goes back to it and presses Enter.
+    goNext()
+    goNext()
+    expect(screen.getByText('Anything else?')).toBeTruthy()
+
+    // Picking later auto-jumps to the first open question (target).
     fireEvent.click(screen.getByRole('button', { name: /later/ }))
-    fireEvent.pointerDown(screen.getByText('Anything else?'))
+    expect(screen.getByText('Which target?')).toBeTruthy()
+
     fireEvent.keyDown(window, { key: 'Enter' })
-    // That Enter sent nothing and moved the cursor to the first open question: Enter picks its row.
+    expect(screen.getByText('Which region?')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'Enter' })
-    fireEvent.keyDown(screen.getByRole('button', { name: /later/ }), { key: 'Enter', ctrlKey: true })
+    // Picking the last open question lands on the final page (later already staged).
+    expect(screen.getByText('Anything else?')).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Enter' })
     await waitFor(() => expect(locks(request)).toHaveLength(3))
-    expect(locks(request)).toEqual([['q0', 'staging'], ['q1', null], ['q2', 'later']])
+    expect(locks(request)).toEqual([['q0', 'staging'], ['q1', 'us'], ['q2', 'later']])
   })
 
-  // An empty multi-select ("pick any") is a valid answer, so it never holds plain Enter back:
-  // mashing Enter from any question the keyboard cursor rests on sends the set within a few
-  // presses instead of landing on the multi-select, where Enter toggles a choice on and off
-  // forever. (On a multi-select row Enter is that toggle by design; a free-text question
-  // takes Enter in its own text field.)
-  const MIXED = [
-    { choices: ['staging', 'production'], multiSelect: false, qid: 'q0', question: 'Which target?' },
-    { choices: ['lint', 'tests', 'docs'], multiSelect: true, qid: 'q1', question: 'Which checks?' },
-    { choices: null, multiSelect: false, qid: 'q2', question: 'Anything else?' },
-    { choices: ['now', 'later'], multiSelect: false, qid: 'q3', question: 'When?' }
-  ]
+  it('plain Enter across a mixed set sends once every required question is closed', async () => {
+    const MIXED = [
+      { choices: ['staging', 'production'], multiSelect: false, qid: 'q0', question: 'Which target?' },
+      { choices: ['lint', 'tests', 'docs'], multiSelect: true, qid: 'q1', question: 'Which checks?' },
+      { choices: null, multiSelect: false, qid: 'q2', question: 'Anything else?' },
+      { choices: ['now', 'later'], multiSelect: false, qid: 'q3', question: 'When?' }
+    ]
+    const request = renderSet(MIXED)
 
-  const ENTER_BUDGET = 3
+    fireEvent.click(screen.getByRole('button', { name: /staging/ }))
+    // Multi-select is never "open"; pager lands on free-text.
+    expect(screen.getByText('Anything else?')).toBeTruthy()
 
-  for (const answerFirst of [true, false]) {
-    for (const start of ['Which target?', 'When?']) {
-      it(`plain Enter from "${start}" sends the set within ${ENTER_BUDGET} presses (q0 ${answerFirst ? 'answered' : 'open'})`, async () => {
-        const request = renderSet(MIXED)
+    fireEvent.change(screen.getByPlaceholderText(/Type your answer/), { target: { value: 'after 5pm' } })
+    goNext()
+    fireEvent.click(screen.getByRole('button', { name: /later/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Confirm and continue/ }))
 
-        if (answerFirst) {
-          fireEvent.click(screen.getByRole('button', { name: /staging/ }))
-        }
-
-        fireEvent.change(screen.getByPlaceholderText(/Type your answer/), { target: { value: 'after 5pm' } })
-        fireEvent.click(screen.getByRole('button', { name: /later/ }))
-        // Clicking a question heading takes focus out of the text field a pick moved it into.
-        screen.getByPlaceholderText(/Type your answer/).blur()
-        fireEvent.pointerDown(screen.getByText(start))
-
-        for (let press = 0; press < ENTER_BUDGET; press += 1) {
-          fireEvent.keyDown(window, { key: 'Enter' })
-        }
-
-        await waitFor(() => expect(locks(request)).toHaveLength(4))
-        expect(locks(request)).toEqual([['q0', 'staging'], ['q1', null], ['q2', 'after 5pm'], ['q3', 'later']])
-      })
-    }
-  }
+    await waitFor(() => expect(locks(request)).toHaveLength(4))
+    expect(locks(request)).toEqual([['q0', 'staging'], ['q1', null], ['q2', 'after 5pm'], ['q3', 'later']])
+  })
 })

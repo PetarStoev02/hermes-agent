@@ -11,6 +11,8 @@ export const ruClarify: Partial<ClarifyCopy> = {
   skipped: 'Пропущено',
   noAnswer: 'Нет ответа',
   confirmAndContinueLabel: 'Подтвердить и продолжить',
+  back: 'Назад',
+  next: 'Далее',
   singleSelectHint: 'Выберите один',
   multiSelectHint: 'Выберите все подходящие',
   oneQuestion: '1 вопрос',

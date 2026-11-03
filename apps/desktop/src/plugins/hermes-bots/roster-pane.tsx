@@ -44,6 +44,7 @@ import { $activityToasts } from './roster-actions'
 import { renderRosterContent } from './roster-pane-content'
 import { deriveRosterPresentation, deriveRosterRows, sortRosterBots } from './roster-pane-derivation'
 import { renderRosterDialogs } from './roster-pane-dialogs'
+import { RosterPaneFooter } from './roster-pane-footer'
 import { RosterGroupRowView } from './roster-pane-groups'
 import { $lastSources, usePublishRosterSnapshot } from './roster-pane-lifecycle'
 import { rosterSectionRenderers } from './roster-pane-sections'
@@ -527,6 +528,7 @@ export function BotsPane() {
         renderUserSections,
         renderHiddenGatewaySection
       })}
+      <RosterPaneFooter />
       {renderRosterDialogs({
         b,
         t,

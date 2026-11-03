@@ -10,6 +10,10 @@ export interface ClarifyCopy {
   skipped: string
   noAnswer: string
   confirmAndContinueLabel: string
+  /** Multi-question pager: previous question. */
+  back: string
+  /** Multi-question pager: advance to the next question. */
+  next: string
   singleSelectHint: string
   multiSelectHint: string
   oneQuestion: string

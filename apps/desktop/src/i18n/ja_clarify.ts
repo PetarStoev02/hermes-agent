@@ -11,6 +11,8 @@ export const jaClarify: Partial<ClarifyCopy> = {
   skipped: 'スキップ済み',
   noAnswer: '回答なし',
   confirmAndContinueLabel: '確定して続行',
+  back: '戻る',
+  next: '次へ',
   singleSelectHint: '1つ選ぶ',
   multiSelectHint: '該当するものをすべて選択',
   oneQuestion: '1問',

@@ -11,6 +11,8 @@ export const enClarify: ClarifyCopy = {
   skipped: 'Skipped',
   noAnswer: 'No answer',
   confirmAndContinueLabel: 'Confirm and continue',
+  back: 'Back',
+  next: 'Next',
   singleSelectHint: 'Pick one',
   multiSelectHint: 'Select all that apply',
   oneQuestion: '1 question',

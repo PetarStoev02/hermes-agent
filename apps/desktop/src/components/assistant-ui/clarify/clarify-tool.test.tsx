@@ -661,6 +661,15 @@ function renderLiveBatch(lockedAnswers?: Record<string, string>, multiSelect = f
   return { request, respond }
 }
 
+/** Advance the Grok-style clarify pager to the next question. */
+function goNext() {
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+}
+
+function goBack() {
+  fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+}
+
 describe('readClarifyResult', () => {
   it('parses responses with string and list answers', () => {
     const parsed = readClarifyResult(
@@ -700,6 +709,7 @@ describe('ClarifyTool submit shortcut', () => {
   it('submits the batch from its text field while preserving multiline input', async () => {
     for (const modifier of [{ metaKey: true }, { ctrlKey: true }]) {
       const { request } = renderLiveBatch()
+      goNext()
       const field = screen.getByPlaceholderText('Type your answer…')
       fireEvent.change(field, { target: { value: 'packet' } })
       field.focus()
@@ -732,14 +742,15 @@ describe('ClarifyTool batch card', () => {
     renderClarify(<ClarifyTool {...liveBatchProps()} />)
 
     expect(screen.getByText('Color?')).toBeTruthy()
-    expect(screen.getByText('Name?')).toBeTruthy()
     // The spinner card is gone; the preview keeps only a screen-reader loading cue.
     expect(screen.queryByRole('status', { name: /loading question/i })).toBeNull()
     expect(screen.getByRole('status').textContent).toMatch(/loading question/i)
     expect(document.querySelector('[data-clarify-batch-preview]')?.getAttribute('aria-busy')).toBe('true')
-    // Nothing is answerable yet: no qids to respond with.
+    // Nothing is answerable yet: no qids to respond with. Pager still lets the user read ahead.
     expect((screen.getByRole('button', { name: /red/ }) as HTMLButtonElement).disabled).toBe(true)
     expect((screen.getByRole('button', { name: /Skip/ }) as HTMLButtonElement).disabled).toBe(true)
+    goNext()
+    expect(screen.getByText('Name?')).toBeTruthy()
     expect((screen.getByRole('button', { name: /Confirm and continue/ }) as HTMLButtonElement).disabled).toBe(true)
   })
 
@@ -838,6 +849,7 @@ describe('ClarifyTool batch card', () => {
     expect(screen.getByText('0 of 2 answered')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /red/ }))
+    expect(screen.getByText('Name?')).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('Type your answer…'), { target: { value: 'packet' } })
     fireEvent.submit(document.querySelector('form') as HTMLFormElement)
 
@@ -857,14 +869,14 @@ describe('ClarifyTool batch card', () => {
 
   it('stages locally and enables the single confirm once one question is answered', async () => {
     const { request } = renderLiveBatch()
-    const confirm = screen.getByRole('button', { name: /Confirm and continue/ })
 
-    expect((confirm as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy()
 
-    // Staging a pick sends NOTHING to the server.
+    // Staging a pick sends NOTHING to the server; the pager advances to the next open question.
     fireEvent.click(screen.getByRole('button', { name: /red/ }))
     expect(screen.getByText('1 of 2 answered')).toBeTruthy()
     expect(request).not.toHaveBeenCalled()
+    const confirm = screen.getByRole('button', { name: /Confirm and continue/ })
     expect((confirm as HTMLButtonElement).disabled).toBe(false)
 
     fireEvent.change(screen.getByPlaceholderText('Type your answer…'), { target: { value: 'packet' } })
@@ -901,7 +913,9 @@ describe('ClarifyTool batch card', () => {
     const { request } = renderLiveBatch()
 
     fireEvent.click(screen.getByRole('button', { name: /red/ }))
+    goBack()
     fireEvent.click(screen.getByRole('button', { name: /blue/ }))
+    expect(screen.getByText('Name?')).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('Type your answer…'), { target: { value: 'packet' } })
     fireEvent.submit(document.querySelector('form') as HTMLFormElement)
 
@@ -925,6 +939,7 @@ describe('ClarifyTool batch card', () => {
     // Typing in "Other" must not silently drop the pick already made.
     expect(screen.getByRole('button', { name: /red/ }).getAttribute('aria-pressed')).toBe('true')
 
+    goNext()
     fireEvent.change(screen.getByPlaceholderText('Type your answer…'), { target: { value: 'packet' } })
     fireEvent.submit(document.querySelector('form') as HTMLFormElement)
 
@@ -949,6 +964,7 @@ describe('ClarifyTool batch card', () => {
     expect((other as HTMLInputElement).value).toBe('green')
     expect(screen.getByRole('button', { name: /red/ }).getAttribute('aria-pressed')).toBe('true')
 
+    goNext()
     fireEvent.change(screen.getByPlaceholderText('Type your answer…'), { target: { value: 'packet' } })
     fireEvent.submit(document.querySelector('form') as HTMLFormElement)
 
@@ -980,6 +996,7 @@ describe('ClarifyTool batch card', () => {
   it('lets an answer locked from the composer replace the pick staged on the card', () => {
     renderLiveBatch()
     fireEvent.click(screen.getByRole('button', { name: /red/ }))
+    goBack()
 
     act(() =>
       setClarifyRequest({
@@ -1191,6 +1208,7 @@ describe('ClarifyTool owner routing', () => {
     renderClarify(<ClarifyTool {...liveBatchProps()} />)
 
     fireEvent.click(screen.getByRole('button', { name: /red/ }))
+    expect(screen.getByText('Name?')).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('Type your answer…'), { target: { value: 'packet' } })
     fireEvent.click(screen.getByRole('button', { name: /Confirm and continue/ }))
 

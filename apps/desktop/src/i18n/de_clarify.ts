@@ -11,6 +11,8 @@ export const deClarify: Partial<ClarifyCopy> = {
   skipped: 'Übersprungen',
   noAnswer: 'Keine Antwort',
   confirmAndContinueLabel: 'Bestätigen und fortfahren',
+  back: 'Zurück',
+  next: 'Weiter',
   singleSelectHint: 'Eines auswählen',
   multiSelectHint: 'Alle Treffer auswählen',
   oneQuestion: '1 Frage',

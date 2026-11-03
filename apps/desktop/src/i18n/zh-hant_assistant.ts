@@ -309,6 +309,8 @@ export const zhHantAssistant = {
       skipped: '已略過',
       noAnswer: '未回答',
       confirmAndContinueLabel: '確認並繼續',
+      back: '返回',
+      next: '下一步',
       singleSelectHint: '選一個',
       oneQuestion: '1 個問題',
       multiSelectHint: '可多選',
