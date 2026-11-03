@@ -85,6 +85,10 @@ export interface BotMeta {
   /** Legacy single-group scalar, projected alongside `groups`. */
   group?: null | string
   pinned?: boolean
+  /** Order among pinned tiles in the roster grid. Lower first; unset falls to
+   *  activity. Cleared when the bot is unpinned. Same role as a group room's
+   *  `rosterOrder`, but on bot meta because pins are a Desktop preference. */
+  pinnedOrder?: number
   /** Raise this bot's Screen tab when it starts driving its desktop (`screen-autoraise.ts`). Opt-in per bot. */
   screenAutoOpen?: boolean
   shape?: string

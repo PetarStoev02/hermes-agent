@@ -64,6 +64,7 @@ import { $activeGroupMemberKeys } from './group-presence'
 import { fallbackSelectionAfterHide, isBotHidden, isBotPinned } from './hidden-bots'
 import { useBots } from './i18n'
 import { displayName, stripPreviewMarkdown } from './labels'
+import { setBotPinned } from './pinned-bots'
 import { duplicateBot } from './profile-ops'
 import { botRecentSession, openBotRecentSession } from './recent-session'
 import { openRosterBot } from './roster-actions'
@@ -361,13 +362,11 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
           onSelect={() => {
             void ensureBotMetadata(bot)
               .then(current => {
-                const pinned = Boolean(current.pinned)
-                void saveBotMeta(bot, {
-                  pinned: !pinned
-                })
+                const wasPinned = Boolean(current.pinned)
+                void setBotPinned(bot, !wasPinned, $botMeta.get())
                 host.notify({
                   kind: 'info',
-                  message: pinned
+                  message: wasPinned
                     ? b.bot.unpinnedToast(displayName(bot, current))
                     : b.bot.pinnedToast(displayName(bot, current))
                 })

@@ -5,6 +5,7 @@ import { groupChatMemberBots, groupChatNames, groupLastActivity } from './group-
 import { sortGroupRosterRows } from './group-order'
 import { isBotPinned } from './hidden-bots'
 import { isBotHidden } from './hidden-bots'
+import { pinnedBotsFromRoster } from './pinned-bots'
 import { filterBotsByGateway, groupMatchesRosterFilters, rosterGatewaySections } from './roster-sections'
 import type { rosterGatewayOptions } from './roster-sections'
 import { botRosterMeta } from './routing'
@@ -105,13 +106,19 @@ export function deriveRosterRows({
     }))
     .filter(row => rowKindFilter !== 'bots' && rosterActivityMatches(row, activityFilter))
 
+  // Pinned bots leave their folders for the tile grid above; they keep
+  // section membership in meta so unpinning restores their place.
+  const reachableFiltered = preferReachableSameNameRows(filteredRoster)
+  const pinnedBots = rowKindFilter === 'groups' ? [] : pinnedBotsFromRoster(reachableFiltered, allMeta, activityOf)
+  const folderBots = reachableFiltered.filter(bot => !isPinned(bot))
+
   const botRows =
     rowKindFilter === 'groups'
       ? []
-      : preferReachableSameNameRows(filteredRoster).map((bot): RosterBotRow => ({
+      : folderBots.map((bot): RosterBotRow => ({
           kind: 'bot',
           bot,
-          pinned: isPinned(bot),
+          pinned: false,
           activity: activityOf(bot),
           active: activeRosterKeys.has(botRosterKey(bot))
         }))
@@ -127,6 +134,7 @@ export function deriveRosterRows({
     visibleRoster,
     filteredHiddenBots,
     groupNames,
+    pinnedBots,
     rosterRows,
     sortedGroupRows,
     gatewaySections,
