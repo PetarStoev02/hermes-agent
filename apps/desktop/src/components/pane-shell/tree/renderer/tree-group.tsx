@@ -512,13 +512,21 @@ export function TreeGroup({
   // it is the resolver's call, not this component's — see strip-visibility.ts
   // for the precedence. The same resolver answers for the toggle command, so
   // the keystroke and the screen always agree about which way "toggle" points.
-  const stripVisible = tabStripVisibleForZone({
-    active: activeId,
-    isCollapsePane,
-    mode: node.tabStrip,
-    paneFor,
-    shown
-  })
+  //
+  // Bot Mode: the main session strip is redundant — the floating name pill
+  // names the open bot, and the roster opens chats. Force the strip off for
+  // any zone that hosts session tabs so "+", close, and multi-tab chrome stay
+  // out of the way (Sessions mode is unchanged).
+  const stripVisible =
+    workspaceMode === 'bots' && shown.some(isSessionStripPane)
+      ? false
+      : tabStripVisibleForZone({
+          active: activeId,
+          isCollapsePane,
+          mode: node.tabStrip,
+          paneFor,
+          shown
+        })
 
   // A group collapses ALONG its parent split's axis. In a row that means the
   // WIDTH collapses — a full-width horizontal header would strand a tall

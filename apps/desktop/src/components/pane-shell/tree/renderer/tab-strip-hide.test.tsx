@@ -116,4 +116,19 @@ describe('tab strip hide grammar', () => {
     expect(toggleTargetZoneTabStrip()).toBe('always')
     expect(tabStripVisibleForGroup(groupNode())).toBe(true)
   })
+
+  it('Bot Mode hides the main session strip even when the zone would otherwise show it', async () => {
+    const { $workspaceMode } = await import('@/components/pane-shell/workspace-scope')
+    // Lone main workspace is stranded → strip on in Sessions mode.
+    $layoutTree.set(split('column', [group(['workspace'], { active: 'workspace', id: 'grp-chat' })]))
+    $workspaceMode.set('sessions')
+    const { rerender } = render(<LiveTreeGroup />)
+    expect(tablist()).toBeTruthy()
+
+    $workspaceMode.set('bots')
+    rerender(<LiveTreeGroup />)
+    expect(tablist()).toBeNull()
+
+    $workspaceMode.set('sessions')
+  })
 })

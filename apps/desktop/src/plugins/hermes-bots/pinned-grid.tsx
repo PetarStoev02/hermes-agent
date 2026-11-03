@@ -173,31 +173,38 @@ export function PinnedGrid({ bots, onEdit }: PinnedGridProps) {
           {b.bot.pinToTop}
         </div>
       ) : (
-        <div
-          className="grid gap-1 px-0 pb-1 pt-1"
-          style={{ gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))` }}
-        >
+        // Flex + justify-center so a short last row (2 of 4, 1 of 3, …) sits
+        // in the middle of the strip instead of hugging the left edge. Tile
+        // width stays 1/columns so a full row still fills the roster.
+        <div className="flex flex-wrap justify-center gap-1 px-0 pb-1 pt-1">
           {bots.map(bot => (
-            <PinnedTile
-              avatarSize={layout.avatarSize}
-              bot={bot}
-              dragging={dragging === `pin:${botRosterKey(bot)}`}
+            <div
+              className="min-w-0"
               key={botRosterKey(bot)}
-              onDropBot={() => dropPinBot(botRosterKey(bot))}
-              onDropPin={() => dropReorder(botRosterKey(bot))}
-              onEdit={onEdit}
-              onUnpin={() => {
-                void ensureBotMetadata(bot)
-                  .then(current => {
-                    void setBotPinned(bot, false, allMeta)
-                    host.notify({
-                      kind: 'info',
-                      message: b.bot.unpinnedToast(displayName(bot, current))
-                    })
-                  })
-                  .catch(error => host.notifyError?.(error, b.bot.metadataLoadFailed))
+              style={{
+                width: `calc((100% - ${(layout.columns - 1) * 0.25}rem) / ${layout.columns})`
               }}
-            />
+            >
+              <PinnedTile
+                avatarSize={layout.avatarSize}
+                bot={bot}
+                dragging={dragging === `pin:${botRosterKey(bot)}`}
+                onDropBot={() => dropPinBot(botRosterKey(bot))}
+                onDropPin={() => dropReorder(botRosterKey(bot))}
+                onEdit={onEdit}
+                onUnpin={() => {
+                  void ensureBotMetadata(bot)
+                    .then(current => {
+                      void setBotPinned(bot, false, allMeta)
+                      host.notify({
+                        kind: 'info',
+                        message: b.bot.unpinnedToast(displayName(bot, current))
+                      })
+                    })
+                    .catch(error => host.notifyError?.(error, b.bot.metadataLoadFailed))
+                }}
+              />
+            </div>
           ))}
         </div>
       )}
