@@ -57,6 +57,7 @@ import {
   ROSTER_KEY,
   saveBotMeta
 } from './data'
+import { GroupAvatarCluster } from './group-avatar-cluster'
 import { $groupChats, $groupChatWorkspace } from './group-chat'
 import { botGroups, groupLastActivity } from './group-membership'
 import { toggleGroupChatPinned } from './group-pin'
@@ -568,25 +569,12 @@ export function GroupRow({ active, group, members, needsYou, onOpen, onDisband, 
       }}
     >
       <div className="relative flex w-[34px] shrink-0 items-center justify-center">
-        {room.image ? (
-          <img
-            alt=""
-            className={cn(
-              'size-8 rounded-md object-cover ring-1 ring-(--ui-stroke-tertiary)',
-              availableMembers === 0 && 'grayscale opacity-60'
-            )}
-            src={room.image}
-          />
-        ) : (
-          <span
-            className={cn(
-              'flex size-8 items-center justify-center rounded-md bg-(--chrome-action-hover) text-(--ui-text-tertiary)',
-              availableMembers === 0 && 'opacity-60'
-            )}
-          >
-            <Codicon name="organization" />
-          </span>
-        )}
+        <GroupAvatarCluster
+          dimmed={availableMembers === 0}
+          image={room.image}
+          members={members}
+          size={32}
+        />
         {members.length > 0 && availableMembers < members.length ? (
           <Tip label={availabilityLabel}>
             <span
