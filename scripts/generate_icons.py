@@ -120,6 +120,17 @@ _CANARY_TAG_RE = re.compile(
     r"\+canary\.20\d{6}T\d{6}Z$"
 )
 
+# Hermes Local plate: deep navy into indigo with a lavender glow low right
+# (the T3 Nightly look). Gradient units are the tile's bounding box.
+LOCAL_PLATE_TOP = "#12123c"
+LOCAL_PLATE_DEFS = (
+    '<defs><linearGradient id="local-plate" x1="0" y1="0" x2="0" y2="1">'
+    '<stop offset="0" stop-color="#12123c"/><stop offset="1" stop-color="#2c2270"/></linearGradient>'
+    '<radialGradient id="local-glow" cx="0.72" cy="1.05" r="0.62">'
+    '<stop offset="0" stop-color="#9684de" stop-opacity="0.8"/>'
+    '<stop offset="1" stop-color="#9684de" stop-opacity="0"/></radialGradient></defs>'
+)
+
 # The nous dark background (#0d1117) — fixed dark tile/background everywhere.
 DARK_HEX = "#0d1117"
 DARK_RGB = (13, 17, 23)
@@ -296,23 +307,28 @@ TARGETS: list[tuple[str, str, object]] = [
 class IconArt:
     """One generation's rendering inputs and caches; never writes to source."""
 
-    def __init__(self, source: Path, *, colors: tuple[str, str] | None = None, commit: str = ""):
+    def __init__(self, source: Path, *, colors: tuple[str, str] | None = None, commit: str = "",
+                 backdrop: bool = False):
         assets = source / "assets"
         self.source = source
         self.colors = colors
         self.commit = commit
+        # Hermes Local: gradient plate and the white girl in every appearance.
+        self.backdrop = backdrop
+        light_girl = "white" if backdrop else "black"
+        self.light_girl = light_girl
         self.girls = {color: assets / f"nous-girl-{color}.svg" for color in ("black", "white")}
         self.backgrounds = assets / "backgrounds"
         self.paths: dict[str, str] = {}
         self.bboxes: dict[str, tuple[float, float, float, float]] = {}
-        self.master = compose_svg(self, "black", "squircle-light.svg")
+        self.master = compose_svg(self, light_girl, "squircle-light.svg")
         self.master_dark = compose_svg(self, "white", "squircle-dark.svg")
         # macOS icons sit on Apple's 824-on-1024 grid, not the full-bleed
         # squircle: same art, mac-grid backgrounds, icns targets only.
-        self.master_mac = compose_svg(self, "black", "squircle-mac-light.svg")
+        self.master_mac = compose_svg(self, light_girl, "squircle-mac-light.svg")
         self.master_mac_dark = compose_svg(self, "white", "squircle-mac-dark.svg")
         # Badge-free twins for direct renders below BADGE_MIN_SIZE.
-        self.master_small = compose_svg(self, "black", "squircle-light.svg", badge=False)
+        self.master_small = compose_svg(self, light_girl, "squircle-light.svg", badge=False)
         self.master_dark_small = compose_svg(self, "white", "squircle-dark.svg", badge=False)
 
 
@@ -359,7 +375,15 @@ def girl_layer(
 def background_inner(art: IconArt, name: str) -> tuple[str, int, int]:
     """Inner content + (width, height) of a background SVG asset."""
     text = (art.backgrounds / name).read_text(encoding="utf-8-sig")
-    if art.colors:
+    if art.backdrop:
+        text = text.replace('fill="#ffffff"', 'fill="url(#local-plate)"')
+        text = text.replace(f'fill="{DARK_HEX}"', 'fill="url(#local-plate)"')
+        # Same rect again, carrying the glow; gradients are bbox-relative.
+        tile = re.search(r"<rect\b[^>]*/>", text)
+        assert tile, f"no background rectangle in {name}"
+        glow = tile.group(0).replace('fill="url(#local-plate)"', 'fill="url(#local-glow)"')
+        text = text.replace(tile.group(0), f"{LOCAL_PLATE_DEFS}{tile.group(0)}{glow}")
+    elif art.colors:
         text = text.replace('fill="#ffffff"', f'fill="{art.colors[0]}"')
         text = text.replace(f'fill="{DARK_HEX}"', f'fill="{art.colors[1]}"')
     root = ET.fromstring(text)
@@ -480,7 +504,7 @@ def compose_svg(art: IconArt, girl: str, bg: str, *, badge: bool = True) -> str:
     the composition is size-agnostic — no manual box scaling)."""
     inner, w, h = background_inner(art, bg)
     background = ET.fromstring(f"<g>{inner}</g>")
-    tile = background.find("{http://www.w3.org/2000/svg}rect")
+    tile = background.find(".//{http://www.w3.org/2000/svg}rect")
     assert tile is not None, f"no background rectangle in {bg}"
     geometry = {key: float(tile.attrib[key]) for key in ("x", "y", "width", "height", "rx")}
     silhouette = ET.Element("rect", {key: str(value) for key, value in geometry.items()})
@@ -630,16 +654,22 @@ def icon_border_svg(ink: str) -> str:
     )
 
 
-def icon_art_svg(art: IconArt, girl: str) -> str:
+def icon_art_svg(art: IconArt, girl: str, *, plate: bool = True) -> str:
     """Art layer: the girl registered as on the canvas-filling squircle, joined
-    to the border band; the commit badge rides along for commit builds."""
+    to the border band; the commit badge rides along for commit builds.
+    Hermes Local bakes its gradient plate in: icon.json fills are solid only."""
     bg = "icon.icon"  # the plate is the canvas; the system supplies the grid
     join_bottom = ICON_CANVAS - ICON_CANVAS * BORDER_FRACTION + 10 if BORDER_ENABLED else ICON_CANVAS * (1 + EDGE_OVERSHOOT)
     portrait = portrait_layer(art, girl, bg, join_bottom)
     badge = f"  {commit_layer(art.commit, bg)}\n" if art.commit else ""
+    backdrop = ""
+    if art.backdrop and plate:
+        rect = f'x="0" y="0" width="{ICON_CANVAS}" height="{ICON_CANVAS}"'
+        backdrop = (f'  {LOCAL_PLATE_DEFS}<rect {rect} fill="url(#local-plate)"/>'
+                    f'<rect {rect} fill="url(#local-glow)"/>\n')
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {ICON_CANVAS} {ICON_CANVAS}">\n'
-        f"{badge}"
+        f"{backdrop}{badge}"
         f"  {ET.tostring(portrait, encoding='unicode')}\n"
         "</svg>\n"
     )
@@ -673,7 +703,8 @@ def icon_mono_image(art: IconArt) -> Image.Image:
         return layer
 
     out = Image.new("RGBA", (ICON_CANVAS, ICON_CANVAS), (0, 0, 0, 0))
-    paints = [(coverage(icon_art_svg(art, "black")), MONO_INK), (coverage(icon_art_svg(art, "white")), (1.0, 1.0))]
+    paints = [(coverage(icon_art_svg(art, "black", plate=False)), MONO_INK),
+              (coverage(icon_art_svg(art, "white", plate=False)), (1.0, 1.0))]
     if BORDER_ENABLED:
         paints.append((coverage(icon_border_svg("#ffffff")), MONO_RING))
     for alpha, (tone, opacity) in paints:
@@ -774,7 +805,7 @@ def girl_mark(art: IconArt, kind: str, size: int) -> Image.Image:
     icon shape. girl_light: black girl on white squircle.  girl_dark: white
     girl on #0d1117 squircle."""
     if kind == "girl_light":
-        girl, bg = "black", "squircle-light.svg"
+        girl, bg = art.light_girl, "squircle-light.svg"
     else:
         girl, bg = "white", "squircle-dark.svg"
     return render_svg(compose_svg(art, girl, bg), size)
@@ -816,7 +847,7 @@ def target_bytes(art: IconArt, kind: str, arg: object) -> bytes:
     elif kind == "icon_border":
         save_png(render_svg(icon_border_svg(arg), ICON_CANVAS), buf)
     elif kind == "icon_art":
-        save_png(render_svg(icon_art_svg(art, arg), ICON_CANVAS), buf)
+        save_png(render_svg(icon_art_svg(art, art.light_girl if arg == "black" else arg), ICON_CANVAS), buf)
     elif kind == "icon_mono":
         save_png(icon_mono_image(art), buf)
     elif kind == "ico":
@@ -857,7 +888,7 @@ def build_art(source: Path) -> tuple[IconArt, IconArt]:
     """Personal `local` branch: every desktop build wears the Hermes Local
     purple (no commit badge), so it never looks like the official app.
     Shared branding stays stable."""
-    return IconArt(source), IconArt(source, colors=("#6b4ee1", "#1a1450"))
+    return IconArt(source), IconArt(source, colors=(LOCAL_PLATE_TOP, LOCAL_PLATE_TOP), backdrop=True)
 
 
 def cmd_write(source: Path, out: Path) -> int:
