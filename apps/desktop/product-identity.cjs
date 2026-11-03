@@ -46,14 +46,12 @@ const canary = /\+canary\.20\d{6}T\d{6}Z$/.test(process.env.HERMES_PAYLOAD_TAG |
 // seven-character commit suffix also names the CLI and fits MSIX's name cap.
 const buildCommitEnv = process.env.HERMES_BUILD_COMMIT || ''
 const buildCommit = /^[a-f0-9]{40}$/.test(buildCommitEnv) ? buildCommitEnv.slice(0, 7) : null
-const displayName = buildCommit
-  ? `${name.display} ${buildCommit}`
-  : canary
-    ? `${name.display} Canary`
-    : name.display
-
-const kebabSuffix = buildCommit ? `-${buildCommit}` : canary ? '-canary' : ''
-const pascalSuffix = buildCommit ? `Commit${buildCommit}` : canary ? 'Canary' : ''
+// Personal `local` branch: every build is "Hermes Local", one fixed nonstable
+// identity (own appId, userData, single-instance lock and CLI name). Rebuilds
+// replace each other but never the official app, and no feed is published.
+const displayName = 'Hermes Local'
+const kebabSuffix = '-local'
+const pascalSuffix = 'Local'
 const cliName = `${light ? 'hermes-light' : 'hermes'}${kebabSuffix}`
 if (store && (canary || buildCommit)) {
   throw new Error('Store packaging is only eligible for stable releases')
@@ -67,8 +65,8 @@ const identity = {
   light,
   displayName,
   appId: `com.nousresearch.${name.kebab}${kebabSuffix}`,
-  // Store and commit builds do not publish a release feed.
-  channel: store || buildCommit ? null : light ? (canary ? 'light-canary' : 'light') : (canary ? 'canary' : 'latest'),
+  // No feed: electron-builder emits no publish config, so nothing auto-updates.
+  channel: null,
   appNamePascal: `${name.pascal}${pascalSuffix}`,
   artifactNamePascal: name.pascal,
   windowsExecutableName: kebabSuffix ? cliName : displayName,
