@@ -361,7 +361,8 @@ export function SectionDropZone({ children, indent = 0, isSource, onDropBot }: S
     <div
       className={cn(
         'relative min-w-0 rounded-md transition-[background-color,box-shadow] duration-100',
-        indent > 0 && 'border-l border-(--ui-stroke-tertiary) pl-1',
+        // One hairline guide per nesting level (Grok-style tree rail).
+        indent > 0 && 'border-l border-(--ui-stroke-tertiary) pl-1.5',
         // While a drag is live, every valid target gets a faint outline so the
         // user can see where a drop is allowed before hovering one.
         armed && 'ring-1 ring-inset ring-(--ui-stroke-secondary)',

@@ -273,51 +273,50 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
           mood={botMood}
           name={bot.name}
           shape={shape}
-          size={34}
+          size={36}
         />
       </div>
       <div className="min-w-0 flex-1">
+        {/* Two-line row: name + relative time on top, last-message preview under.
+            Pin state lives in the tile grid now, so rows no longer paint a pin glyph. */}
         <div className="flex items-baseline justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
-            {/* The session row's own lead cell, so a bot's name sits on the
-                same left edge as every session name above it in the rail. */}
             <SidebarRowLead>
               <SessionStatusDot storedSessionId={canonicalSessionId} />
             </SidebarRowLead>
-            {pinned ? (
-              <Tip label={b.roster.pinned}>
-                <Codicon className="shrink-0 text-[0.6875rem] text-(--ui-text-quaternary)" name="pinned" />
-              </Tip>
-            ) : null}
             {hidden ? (
               <Tip label={b.roster.hiddenFromRoster}>
                 <Codicon className="shrink-0 text-[0.6875rem] text-(--ui-text-quaternary)" name="eye-closed" />
               </Tip>
             ) : null}
             <Tip label={rowTooltip}>
-              <span className="min-w-0 truncate text-[0.8125rem] font-medium">{displayName(bot, meta)}</span>
+              <span className="min-w-0 truncate text-[0.8125rem] font-medium text-(--ui-text-primary)">
+                {displayName(bot, meta)}
+              </span>
             </Tip>
           </div>
-          {attention ? (
-            <Tip label={botAttentionHint(attention.reason)}>
-              <Codicon
-                aria-label={b.roster.needsAttention}
-                className="shrink-0 text-[0.6875rem] text-amber-600 dark:text-amber-300"
-                name="warning"
-              />
-            </Tip>
-          ) : null}
-          {isOpening ? (
-            <GlyphSpinner ariaLabel={b.bot.openingChat} className="shrink-0 text-xs text-(--ui-text-secondary)" />
-          ) : null}
-          {rowAgeTs ? (
-            <span className="shrink-0 text-[0.6875rem] text-(--ui-text-quaternary)">
-              {rowAge(rowAgeTs * 1000, t.sidebar.row)}
-            </span>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {attention ? (
+              <Tip label={botAttentionHint(attention.reason)}>
+                <Codicon
+                  aria-label={b.roster.needsAttention}
+                  className="text-[0.6875rem] text-amber-600 dark:text-amber-300"
+                  name="warning"
+                />
+              </Tip>
+            ) : null}
+            {isOpening ? (
+              <GlyphSpinner ariaLabel={b.bot.openingChat} className="text-xs text-(--ui-text-secondary)" />
+            ) : null}
+            {rowAgeTs ? (
+              <span className="text-[0.6875rem] tabular-nums text-(--ui-text-quaternary)">
+                {rowAge(rowAgeTs * 1000, t.sidebar.row)}
+              </span>
+            ) : null}
+          </div>
         </div>
         {showDetailsRow ? (
-          <div className="flex min-w-0 items-center gap-1.5 text-xs text-(--ui-text-tertiary)">
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 pl-[1.125rem] text-[0.75rem] text-(--ui-text-tertiary)">
             {showHandle ? (
               <span className="shrink-0 font-mono text-[0.6875rem] text-(--ui-text-quaternary)">{`@${handle}`}</span>
             ) : null}

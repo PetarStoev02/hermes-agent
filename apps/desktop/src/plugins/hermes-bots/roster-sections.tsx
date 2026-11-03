@@ -245,33 +245,31 @@ export function RosterSectionHeader({
   count,
   describedBy,
   gatewayKind,
-  icon,
+  icon: _icon,
   label,
   onDoubleClick,
   onToggle,
   status,
   tip
 }: RosterSectionHeaderProps) {
+  // Quieter folder chrome: muted title-case label, chevron, count flush right.
+  // Gateway buckets keep their kind glyph; user folders drop the folder/inbox
+  // glyph — nested depth reads from the indent guide line instead.
+  void _icon
+
   const button = (
     <RowButton
       aria-describedby={describedBy}
       aria-expanded={!collapsed}
       className={cn(
-        'flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-(--ui-text-quaternary) transition-colors hover:bg-(--chrome-action-hover) hover:text-(--ui-text-secondary)',
+        'flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[0.75rem] font-medium text-(--ui-text-tertiary) transition-colors hover:bg-(--chrome-action-hover) hover:text-(--ui-text-secondary)',
         action ? 'flex-1' : 'mt-1'
       )}
       onClick={onToggle}
       onDoubleClick={onDoubleClick}
     >
       <DisclosureCaret open={!collapsed} />
-      {gatewayKind ? (
-        <GatewayKindGlyph kind={gatewayKind} />
-      ) : (
-        // TODO(bot-mode-types): neither `gatewayKind` nor `icon` is required, so a header
-        // given neither renders `codicon-undefined`. Both current callers pass exactly one.
-        // @ts-expect-error `icon` is optional here; Codicon's `name` is required.
-        <Codicon className="shrink-0" name={icon} />
-      )}
+      {gatewayKind ? <GatewayKindGlyph kind={gatewayKind} /> : null}
       <span className="flex min-w-0 items-center gap-1">
         <span className="min-w-0 truncate">{label}</span>
         {status && !status.available ? <span className="sr-only">{status.label}</span> : null}
