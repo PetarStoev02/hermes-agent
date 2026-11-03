@@ -854,19 +854,10 @@ def target_bytes(art: IconArt, kind: str, arg: object) -> bytes:
 
 
 def build_art(source: Path) -> tuple[IconArt, IconArt]:
-    """Only desktop outputs carry build identity. Shared branding stays stable."""
-    art = IconArt(source)
-    tag = os.environ.get("HERMES_PAYLOAD_TAG", "")
-    commit = os.environ.get("HERMES_BUILD_COMMIT", "")
-    if commit:
-        if tag:
-            raise ValueError("Commit builds cannot also select HERMES_PAYLOAD_TAG")
-        if not re.fullmatch(r"[a-f0-9]{40}", commit):
-            raise ValueError("HERMES_BUILD_COMMIT requires an exact full 40-character SHA")
-        return art, IconArt(source, colors=("#e34850", "#4a1117"), commit=commit)
-    if _CANARY_TAG_RE.match(tag.strip()):
-        return art, IconArt(source, colors=("#f5cc32", "#443808"))
-    return art, art
+    """Personal `local` branch: every desktop build wears the Hermes Local
+    purple (no commit badge), so it never looks like the official app.
+    Shared branding stays stable."""
+    return IconArt(source), IconArt(source, colors=("#6b4ee1", "#1a1450"))
 
 
 def cmd_write(source: Path, out: Path) -> int:
