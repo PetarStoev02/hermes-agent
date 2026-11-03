@@ -12,8 +12,8 @@ import { isBotPinned } from './hidden-bots'
 import { botRosterMeta } from './routing'
 import type { BotMeta, RosterRow } from './types'
 
-/** MIME used only for reordering tiles inside the pinned grid — folder drop
- *  zones listen for `BOT_DRAG_MIME` and must ignore pin-grid drags. */
+/** MIME for reordering tiles inside the pinned grid. Pin drags ALSO set
+ *  `BOT_DRAG_MIME` so a folder drop can unpin and file the bot. */
 export const PINNED_BOT_DRAG_MIME = 'application/x-hermes-pinned-bot-key'
 
 export interface PinnedGridLayout {
@@ -129,6 +129,48 @@ export async function setBotPinned(bot: RosterRow, pinned: boolean, allMeta: Rec
   }
 
   await saveBotMeta(bot, { pinned: false, pinnedOrder: undefined })
+}
+
+/**
+ * Pin `bot` into the visible grid order. `atKey` null appends; otherwise the
+ * new pin lands where that tile is (pushing it right). Already-pinned bots
+ * just move. Writes dense `pinnedOrder` for every key in the resulting list.
+ */
+export async function pinBotIntoOrder(
+  bot: RosterRow,
+  botsByKey: Map<string, RosterRow>,
+  orderKeys: string[],
+  atKey: null | string
+): Promise<void> {
+  const key = botRosterKey(bot)
+  const next = orderKeys.filter(existing => existing !== key)
+
+  if (atKey && next.includes(atKey)) {
+    next.splice(next.indexOf(atKey), 0, key)
+  } else {
+    next.push(key)
+  }
+
+  botsByKey.set(key, bot)
+  await persistPinnedOrder(botsByKey, next)
+}
+
+/** True when the in-flight roster drag is a bot row (not a pin/group/folder). */
+export function isRosterBotDrag(dragging: null | string): boolean {
+  if (!dragging) {
+    return false
+  }
+
+  if (dragging.startsWith('pin:')) {
+    return false
+  }
+
+  // Group and section payloads share BOT_DRAG_MIME but use these prefixes.
+  if (dragging.startsWith('group:') || dragging.startsWith('section:')) {
+    return false
+  }
+
+  return true
 }
 
 export function pinnedBotsFromRoster(

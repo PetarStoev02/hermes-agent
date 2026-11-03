@@ -684,9 +684,12 @@ export function visibleSectionBlocks<TRow>(
 ): SectionBlock<TRow>[] {
   const hidden = new Set<string>()
   const sorting = Boolean(dragging?.startsWith(SECTION_DRAG_PREFIX))
+  // Bot or pin-grid drag: keep empty Unassigned visible so a pin can land
+  // there to unpin. Folder sorts still use `sorting` alone for that slot.
+  const filing = Boolean(dragging) && !sorting
 
   return blocks.filter(block => {
-    const wanted = block.id ? !nested || Boolean(dragging) : sorting
+    const wanted = block.id ? !nested || Boolean(dragging) : sorting || filing
     const visible = !(block.parentId && hidden.has(block.parentId)) && Boolean(block.total || wanted)
 
     if (block.id && (!visible || collapsed(block.id))) {

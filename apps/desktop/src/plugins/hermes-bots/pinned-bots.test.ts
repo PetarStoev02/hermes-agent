@@ -34,7 +34,9 @@ vi.mock('./routing', () => ({
 import { $botMeta } from './data'
 import { isBotPinned } from './hidden-bots'
 import {
+  isRosterBotDrag,
   nextPinnedOrder,
+  pinBotIntoOrder,
   pinnedBotsFromRoster,
   pinnedGridLayout,
   reorderPinnedKeys,
@@ -67,6 +69,7 @@ describe('sortPinnedBots / pinnedOrder', () => {
       beta: { pinned: true, pinnedOrder: 0 },
       gamma: { pinned: true }
     }
+
     const activity = (row: RosterRow) => ({ alpha: 10, beta: 1, gamma: 50 }[row.name] || 0)
 
     expect(sortPinnedBots([bot('alpha'), bot('gamma'), bot('beta')], meta, activity).map(row => row.name)).toEqual([
@@ -92,16 +95,46 @@ describe('sortPinnedBots / pinnedOrder', () => {
     await setBotPinned(bot('sales'), false, $botMeta.get() as Record<string, BotMeta>)
     expect(saveBotMeta).toHaveBeenCalledWith(bot('sales'), { pinned: false, pinnedOrder: undefined })
   })
+
+  it('pinBotIntoOrder inserts before a tile or appends, and rewrites dense order', async () => {
+    const sales = bot('sales')
+    const cto = bot('cto')
+    const cfo = bot('cfo')
+
+    const byKey = new Map([
+      ['legacy::sales', sales],
+      ['legacy::cto', cto]
+    ])
+
+    await pinBotIntoOrder(cfo, byKey, ['legacy::sales', 'legacy::cto'], 'legacy::cto')
+    expect(saveBotMeta).toHaveBeenCalledWith(cfo, { pinned: true, pinnedOrder: 1 })
+    expect(saveBotMeta).toHaveBeenCalledWith(sales, { pinned: true, pinnedOrder: 0 })
+    expect(saveBotMeta).toHaveBeenCalledWith(cto, { pinned: true, pinnedOrder: 2 })
+
+    saveBotMeta.mockClear()
+    await pinBotIntoOrder(cfo, byKey, ['legacy::sales', 'legacy::cfo', 'legacy::cto'], null)
+    expect(saveBotMeta).toHaveBeenCalledWith(cfo, { pinned: true, pinnedOrder: 2 })
+  })
+
+  it('isRosterBotDrag accepts bot keys and rejects pin/group/section payloads', () => {
+    expect(isRosterBotDrag('local::sales')).toBe(true)
+    expect(isRosterBotDrag('pin:local::sales')).toBe(false)
+    expect(isRosterBotDrag('group:crew')).toBe(false)
+    expect(isRosterBotDrag('section:team')).toBe(false)
+    expect(isRosterBotDrag(null)).toBe(false)
+  })
 })
 
 describe('pinned bots leave folders', () => {
   it('pinnedBotsFromRoster lists pins in order, and folder lists exclude every pin', () => {
     const roster = [bot('sales'), bot('cto'), bot('cfo')]
+
     const allMeta: Record<string, BotMeta> = {
       sales: { pinned: true, pinnedOrder: 1, sectionId: 'team', sectionName: 'Team' },
       cto: { pinned: true, pinnedOrder: 0, sectionId: 'team', sectionName: 'Team' },
       cfo: { sectionId: 'team', sectionName: 'Team' }
     }
+
     const activityOf = () => 0
 
     expect(pinnedBotsFromRoster(roster, allMeta, activityOf).map(row => row.name)).toEqual(['cto', 'sales'])

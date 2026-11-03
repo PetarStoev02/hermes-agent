@@ -1979,6 +1979,12 @@ body.guest-pointer-lock :is(webview, iframe) {
   padding-inline: 1.5rem;
 }
 
+/* Bot Mode name pill floats over the transcript — clear the first lines so
+   messages (and the empty hero) do not render underneath it. */
+[data-slot='thread']:has([data-slot='bot-name-pill']) [data-slot='aui_thread-content'] {
+  padding-top: 2.75rem;
+}
+
 [data-slot='aui_intro'] {
   align-items: center;
   justify-content: center;

@@ -11,20 +11,22 @@ vi.mock('@hermes/plugin-sdk', async () => {
   return {
     ...actual,
     host: { ...(actual.host as object), navigate: hostMocks.navigate },
-    useI18n: () => ({ t: { statusbar: { openCommandCenter: 'Open Command Center' } } })
+    useI18n: () => ({
+      t: { shell: { statusbar: { openCommandCenter: 'Open Command Center' } } }
+    })
   }
 })
 
-import { RosterPaneFooter } from './roster-pane-footer'
+import { RosterCommandCenterButton } from './roster-pane-footer'
 
 afterEach(() => {
   cleanup()
   hostMocks.navigate.mockClear()
 })
 
-describe('RosterPaneFooter', () => {
+describe('RosterCommandCenterButton', () => {
   it('opens Command Center from the ⌘ button', () => {
-    render(<RosterPaneFooter />)
+    render(<RosterCommandCenterButton />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Command Center' }))
     expect(hostMocks.navigate).toHaveBeenCalledWith('/command-center')

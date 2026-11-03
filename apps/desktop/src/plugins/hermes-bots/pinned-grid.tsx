@@ -1,6 +1,7 @@
 /**
  * Tile grid of pinned bots above the roster folders. Click opens the bot's
- * chat (same path as a row). Drag reorders pins via `pinnedOrder`. Context
+ * chat (same path as a row). Drag reorders pins via `pinnedOrder`. Drop a
+ * roster bot here to pin it (empty zone when there are no pins yet). Context
  * menu covers unpin — pinned bots are absent from folder rows.
  */
 
@@ -16,7 +17,7 @@ import {
   Tip,
   useValue
 } from '@hermes/plugin-sdk'
-import type { DragEvent } from 'react'
+import { type DragEvent, useEffect, useState } from 'react'
 
 import { avatarColor, botAppearance, BotFace } from './avatar'
 import { isBackfilledFacePng } from './avatar-image'
@@ -28,12 +29,14 @@ import {
   focusedRosterOwner
 } from './bot-state'
 import { ensureBotMetadata } from './canonical-chat'
-import { $botMeta, botRosterKey } from './data'
+import { $botMeta, $lastRoster, botRosterKey } from './data'
 import { $groupChatWorkspace } from './group-chat'
 import { useBots } from './i18n'
 import { displayName } from './labels'
 import {
+  isRosterBotDrag,
   persistPinnedOrder,
+  pinBotIntoOrder,
   PINNED_BOT_DRAG_MIME,
   pinnedGridLayout,
   reorderPinnedKeys,
@@ -43,7 +46,7 @@ import { openRosterBot } from './roster-actions'
 import { botRosterMeta } from './routing'
 import { botRowOwnsWorkspace, botWorkingMood, useTurnBusy } from './row-helpers'
 import type { RosterRow } from './types'
-import { $draggingBot } from './user-sections'
+import { $draggingBot, BOT_DRAG_MIME } from './user-sections'
 
 interface PinnedGridProps {
   bots: RosterRow[]
@@ -53,17 +56,28 @@ interface PinnedGridProps {
 export function PinnedGrid({ bots, onEdit }: PinnedGridProps) {
   const b = useBots()
   const allMeta = useValue($botMeta)
+  const roster = useValue($lastRoster)
   const dragging = useValue($draggingBot)
   const layout = pinnedGridLayout(bots.length)
+  const acceptingBot = isRosterBotDrag(dragging)
+  const [over, setOver] = useState(false)
 
-  if (!bots.length) {
+  useEffect(() => {
+    if (!dragging) {
+      setOver(false)
+    }
+  }, [dragging])
+
+  // No pins and nothing in flight: stay out of the way. While a bot is
+  // dragged, keep an empty drop strip so the first pin has a target.
+  if (!bots.length && !acceptingBot) {
     return null
   }
 
   const botsByKey = new Map(bots.map(bot => [botRosterKey(bot), bot]))
   const orderKeys = bots.map(botRosterKey)
 
-  const dropOn = (targetKey: string) => {
+  const dropReorder = (targetKey: string) => {
     if (!dragging || !dragging.startsWith('pin:')) {
       return
     }
@@ -78,34 +92,115 @@ export function PinnedGrid({ bots, onEdit }: PinnedGridProps) {
     void persistPinnedOrder(botsByKey, next)
   }
 
+  const dropPinBot = (atKey: null | string) => {
+    if (!dragging || !isRosterBotDrag(dragging)) {
+      return
+    }
+
+    const bot = roster.find(row => botRosterKey(row) === dragging)
+
+    if (!bot) {
+      return
+    }
+
+    void ensureBotMetadata(bot)
+      .then(current => {
+        void pinBotIntoOrder(bot, botsByKey, orderKeys, atKey).then(() => {
+          host.notify({
+            kind: 'info',
+            message: b.bot.pinnedToast(displayName(bot, current))
+          })
+        })
+      })
+      .catch(error => host.notifyError?.(error, b.bot.metadataLoadFailed))
+  }
+
+  const acceptsBot = (event: DragEvent) =>
+    acceptingBot && event.dataTransfer.types.includes(BOT_DRAG_MIME)
+
+  const acceptsPinReorder = (event: DragEvent) =>
+    event.dataTransfer.types.includes(PINNED_BOT_DRAG_MIME)
+
   return (
     <div
       aria-label={b.roster.pinned}
-      className="grid gap-1 px-1.5 pb-2 pt-1"
+      className={cn(
+        'mx-1.5 mb-1 rounded-md transition-[background-color,box-shadow] duration-100',
+        acceptingBot && 'ring-1 ring-inset ring-(--ui-stroke-secondary)',
+        acceptingBot && over && 'bg-(--ui-accent)/10 ring-(--ui-accent)'
+      )}
+      data-drop-over={acceptingBot && over ? 'true' : undefined}
       data-slot="bots-pinned-grid"
-      style={{ gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))` }}
+      onDragEnter={event => {
+        if (acceptsBot(event)) {
+          event.preventDefault()
+          setOver(true)
+        }
+      }}
+      onDragLeave={event => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setOver(false)
+        }
+      }}
+      onDragOver={event => {
+        if (!acceptsBot(event) && !acceptsPinReorder(event)) {
+          return
+        }
+
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+
+        if (acceptsBot(event) && !over) {
+          setOver(true)
+        }
+      }}
+      onDrop={event => {
+        setOver(false)
+        $draggingBot.set(null)
+
+        if (acceptsBot(event)) {
+          event.preventDefault()
+          dropPinBot(null)
+
+          return
+        }
+
+        // Tile-level drop handlers own pin reorder; ignore here.
+      }}
     >
-      {bots.map(bot => (
-        <PinnedTile
-          avatarSize={layout.avatarSize}
-          bot={bot}
-          dragging={dragging === `pin:${botRosterKey(bot)}`}
-          key={botRosterKey(bot)}
-          onDropPin={() => dropOn(botRosterKey(bot))}
-          onEdit={onEdit}
-          onUnpin={() => {
-            void ensureBotMetadata(bot)
-              .then(current => {
-                void setBotPinned(bot, false, allMeta)
-                host.notify({
-                  kind: 'info',
-                  message: b.bot.unpinnedToast(displayName(bot, current))
-                })
-              })
-              .catch(error => host.notifyError?.(error, b.bot.metadataLoadFailed))
-          }}
-        />
-      ))}
+      {bots.length === 0 ? (
+        <div className="flex items-center justify-center px-2 py-3 text-[0.6875rem] text-(--ui-text-quaternary)">
+          {b.bot.pinToTop}
+        </div>
+      ) : (
+        <div
+          className="grid gap-1 px-0 pb-1 pt-1"
+          style={{ gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))` }}
+        >
+          {bots.map(bot => (
+            <PinnedTile
+              avatarSize={layout.avatarSize}
+              bot={bot}
+              dragging={dragging === `pin:${botRosterKey(bot)}`}
+              key={botRosterKey(bot)}
+              onDropBot={() => dropPinBot(botRosterKey(bot))}
+              onDropPin={() => dropReorder(botRosterKey(bot))}
+              onEdit={onEdit}
+              onUnpin={() => {
+                void ensureBotMetadata(bot)
+                  .then(current => {
+                    void setBotPinned(bot, false, allMeta)
+                    host.notify({
+                      kind: 'info',
+                      message: b.bot.unpinnedToast(displayName(bot, current))
+                    })
+                  })
+                  .catch(error => host.notifyError?.(error, b.bot.metadataLoadFailed))
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -114,12 +209,13 @@ interface PinnedTileProps {
   avatarSize: number
   bot: RosterRow
   dragging: boolean
+  onDropBot: () => void
   onDropPin: () => void
   onEdit: (bot: RosterRow) => void
   onUnpin: () => void
 }
 
-function PinnedTile({ avatarSize, bot, dragging, onDropPin, onEdit, onUnpin }: PinnedTileProps) {
+function PinnedTile({ avatarSize, bot, dragging, onDropBot, onDropPin, onEdit, onUnpin }: PinnedTileProps) {
   const b = useBots()
   const allMeta = useValue($botMeta)
   const meta = botRosterMeta(bot, allMeta)
@@ -138,11 +234,14 @@ function PinnedTile({ avatarSize, bot, dragging, onDropPin, onEdit, onUnpin }: P
   const rosterKey = botRosterKey(bot)
 
   const onDragOver = (event: DragEvent) => {
-    if (!event.dataTransfer.types.includes(PINNED_BOT_DRAG_MIME)) {
+    const types = event.dataTransfer.types
+
+    if (!types.includes(PINNED_BOT_DRAG_MIME) && !types.includes(BOT_DRAG_MIME)) {
       return
     }
 
     event.preventDefault()
+    event.stopPropagation()
     event.dataTransfer.dropEffect = 'move'
   }
 
@@ -162,18 +261,32 @@ function PinnedTile({ avatarSize, bot, dragging, onDropPin, onEdit, onUnpin }: P
       onDragEnd={() => $draggingBot.set(null)}
       onDragOver={onDragOver}
       onDragStart={event => {
+        // PINNED mime → reorder inside the grid. BOT mime → drop on a folder
+        // to unpin and file there (same payload folders already accept).
         event.dataTransfer.setData(PINNED_BOT_DRAG_MIME, rosterKey)
+        event.dataTransfer.setData(BOT_DRAG_MIME, rosterKey)
         event.dataTransfer.effectAllowed = 'move'
         $draggingBot.set(`pin:${rosterKey}`)
       }}
       onDrop={event => {
-        if (!event.dataTransfer.types.includes(PINNED_BOT_DRAG_MIME)) {
+        const types = event.dataTransfer.types
+
+        // Pin-tile drag carries both mimes; prefer reorder over re-pin.
+        if (types.includes(PINNED_BOT_DRAG_MIME)) {
+          event.preventDefault()
+          event.stopPropagation()
+          onDropPin()
+          $draggingBot.set(null)
+
           return
         }
 
-        event.preventDefault()
-        onDropPin()
-        $draggingBot.set(null)
+        if (types.includes(BOT_DRAG_MIME)) {
+          event.preventDefault()
+          event.stopPropagation()
+          onDropBot()
+          $draggingBot.set(null)
+        }
       }}
     >
       <div className="relative shrink-0">

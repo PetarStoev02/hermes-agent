@@ -191,14 +191,17 @@ function BotDetailsPanelBody({ bot, tab }: { bot: RosterRow; tab: BotDetailsTab 
     <aside
       aria-label={b.bot.editTitle}
       className={cn(
-        'pointer-events-auto absolute inset-y-0 right-0 z-30 flex w-[min(22rem,100%)] flex-col',
+        // Clear the floating composer so Cancel/Save do not stack as a second
+        // footer on top of the chat bar (--composer-measured-height).
+        'pointer-events-auto absolute top-0 right-0 bottom-[var(--composer-measured-height)] z-30 flex w-[min(22rem,100%)] flex-col',
         'border-l border-(--ui-stroke-secondary) bg-(--ui-widget-surface-background) shadow-nous'
       )}
       data-slot="bot-details-panel"
     >
-      <div className="flex items-center justify-end gap-1 px-2 pt-2">
+      <div className="relative flex flex-col items-center gap-1 px-4 pb-3 pt-3">
         <Button
           aria-label={t.common.close}
+          className="absolute top-2 right-2"
           disabled={busy}
           onClick={() => closeBotDetails()}
           size="icon-sm"
@@ -207,21 +210,18 @@ function BotDetailsPanelBody({ bot, tab }: { bot: RosterRow; tab: BotDetailsTab 
         >
           <Codicon name="close" />
         </Button>
-      </div>
-
-      <div className="flex flex-col items-center gap-1 px-4 pb-3">
         <BotFace color={avatarColor(color, bot.name)} image={image} name={bot.name} shape={shape} size={64} />
         <div className="text-sm font-semibold text-(--ui-text-primary)">{label}</div>
         <div className="font-mono text-[0.65rem] text-(--ui-text-quaternary)">{profileHint}</div>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto border-b border-(--ui-stroke-secondary) px-2">
+      <div className="mx-3 flex gap-0.5 overflow-x-auto rounded-lg bg-(--ui-bg-secondary) p-0.5">
         {TABS.map(entry => (
           <button
             className={cn(
-              'shrink-0 px-2.5 py-1.5 text-[0.75rem] font-medium transition-colors',
+              'min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-[0.6875rem] font-medium transition-colors',
               tab === entry.id
-                ? 'border-b-2 border-(--ui-text-primary) text-(--ui-text-primary)'
+                ? 'bg-(--ui-widget-surface-background) text-(--ui-text-primary) shadow-sm'
                 : 'text-(--ui-text-tertiary) hover:text-(--ui-text-secondary)'
             )}
             key={entry.id}

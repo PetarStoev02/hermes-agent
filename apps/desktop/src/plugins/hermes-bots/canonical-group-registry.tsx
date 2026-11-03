@@ -1,4 +1,4 @@
-import { atom, Button, host, randomUuid, useValue } from '@hermes/plugin-sdk'
+import { atom, host, randomUuid, useValue } from '@hermes/plugin-sdk'
 import { useEffect, useState } from 'react'
 
 import { useCanonicalGroupLabels } from './canonical-group-labels'
@@ -140,13 +140,10 @@ export function CanonicalGroupList({ onOpen }: { onOpen: (key: string, origin: C
   const connectionId = useValue(host.state.connectionId)
   const profile = useValue(host.state.profile)
   const [rooms, setRooms] = useState<ListedRoom[]>([])
-  const [error, setError] = useState('')
-  const [refresh, setRefresh] = useState(0)
   const revision = useValue($canonicalGroupListRevision)
   useEffect(() => {
     let cancelled = false
     setRooms([])
-    setError('')
     void (async () => {
       const route = captureCanonicalGroupRoute()
       const result = await discoverCanonicalGroups(route)
@@ -159,14 +156,19 @@ export function CanonicalGroupList({ onOpen }: { onOpen: (key: string, origin: C
           name: room.name
         })))
       }
-    })().catch(e => { if (!cancelled) {setError(e instanceof Error ? e.message : String(e))} })
+    })().catch(() => {
+      // Quiet: gateway health already lives in the statusbar. Do not paint a
+      // "Refresh gateway groups" / error strip above the roster.
+      if (!cancelled) {setRooms([])}
+    })
 
     return () => { cancelled = true }
-  }, [connectionId, profile, refresh, revision])
+  }, [connectionId, profile, revision])
 
-  return <div className="grid gap-1 px-2">
-    <Button onClick={() => setRefresh(value => value + 1)} variant="ghost">{labels.refreshGroups}</Button>
-    {error && <p role="alert">{error}</p>}
+  // Rooms only — no always-on refresh chrome when empty or offline.
+  if (rooms.length === 0) {return null}
+
+  return <div className="grid gap-1 px-2 pb-1" data-slot="canonical-group-list">
     {rooms.map(room => <CanonicalGroupRow key={room.key} memberCount={room.memberCount} name={room.name}
       onDelete={() => disbandListedRoom(room, labels.disbanded(room.name))} onOpen={() => onOpen(room.key, 'key')} />)}
   </div>

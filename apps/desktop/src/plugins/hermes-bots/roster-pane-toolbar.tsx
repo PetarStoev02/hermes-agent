@@ -15,6 +15,7 @@ import { seatableGroupBots, useGroupCapability } from './canonical-group-capabil
 import { botSourceStatus } from './data'
 import type { useBots } from './i18n'
 import { setActivityToasts } from './roster-actions'
+import { RosterCommandCenterButton } from './roster-pane-footer'
 import { GatewayKindGlyph } from './roster-sections'
 import type { rosterGatewayOptions } from './roster-sections'
 import type { RosterActivityFilter, RosterKindFilter, RosterRow } from './types'
@@ -73,7 +74,7 @@ export function renderRosterToolbar({
   setCreateOpen,
   setGroupCreateOpen,
   setSectionDialog,
-  showRosterTools,
+  showRosterTools: _showRosterTools,
   showRosterSearch,
   showRosterFilters,
   query,
@@ -88,161 +89,151 @@ export function renderRosterToolbar({
   setGatewayFilter
 }: renderRosterToolbarProps) {
   return (
-    <>
-      <div className="flex items-center justify-between gap-2 px-2.5 pt-2.5 pb-1.5">
-        <span className="text-[0.6875rem] font-semibold uppercase tracking-wider text-(--ui-text-quaternary)">
-          Bots
-        </span>
-        <div className="flex items-center gap-0.5">
-          <Tip
-            label={activityToasts ? 'Activity toasts on — click to silence' : 'Activity toasts off — click to enable'}
-          >
+    <div className="flex min-w-0 items-center gap-1 px-2.5 pt-2 pb-1.5">
+      {showRosterSearch ? (
+        <SearchField
+          aria-label={b.roster.search}
+          containerClassName={cn('min-w-0 flex-1', query ? 'opacity-100!' : 'opacity-50 focus-within:opacity-100')}
+          inputClassName="w-full text-[0.75rem] placeholder:text-(--ui-text-tertiary)"
+          key={'roster-search'}
+          onChange={setQuery}
+          placeholder={b.roster.searchPlaceholder}
+          value={query}
+        />
+      ) : (
+        <span className="min-w-0 flex-1" key={'roster-search-spacer'} />
+      )}
+      <RosterCommandCenterButton />
+      <Tip
+        label={activityToasts ? 'Activity toasts on — click to silence' : 'Activity toasts off — click to enable'}
+      >
+        <Button
+          className="rounded-md text-(--ui-text-tertiary) hover:text-foreground"
+          onClick={() => setActivityToasts(!activityToasts)}
+          size="icon-xs"
+          variant="ghost"
+        >
+          <Codicon name={activityToasts ? 'bell' : 'bell-slash'} />
+        </Button>
+      </Tip>
+      <DropdownMenu>
+        <Tip label="New…">
+          <DropdownMenuTrigger asChild>
             <Button
+              aria-label={b.roster.newBotOrGroup}
               className="rounded-md text-(--ui-text-tertiary) hover:text-foreground"
-              onClick={() => setActivityToasts(!activityToasts)}
               size="icon-xs"
               variant="ghost"
             >
-              <Codicon name={activityToasts ? 'bell' : 'bell-slash'} />
+              <Codicon name="add" />
             </Button>
+          </DropdownMenuTrigger>
+        </Tip>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
+            <Codicon className="mr-1.5" name="hubot" />
+            {b.bot.newTitle}
+          </DropdownMenuItem>
+          <NewGroupChatItem label={b.group.newTitle} onSelect={() => setGroupCreateOpen(true)} roster={roster} />
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => setSectionDialog({ mode: 'create' })}>
+            <Codicon className="mr-1.5" name="new-folder" />
+            {b.sections.newSection}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {showRosterFilters ? (
+        <DropdownMenu key={'roster-filters'}>
+          <Tip label={activeFilterCount ? `Filters (${activeFilterCount} active)` : 'Filter roster'}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                aria-label={activeFilterCount ? `Filter roster, ${activeFilterCount} active` : 'Filter roster'}
+                className={cn(
+                  'size-7 shrink-0 rounded-md text-(--ui-text-tertiary) hover:text-foreground',
+                  activeFilterCount && 'text-(--ui-accent)'
+                )}
+                size="icon-xs"
+                variant="ghost"
+              >
+                <Codicon name="list-filter" />
+              </Button>
+            </DropdownMenuTrigger>
           </Tip>
-          <DropdownMenu>
-            <Tip label="New…">
-              <DropdownMenuTrigger asChild>
-                <Button
-                  aria-label={b.roster.newBotOrGroup}
-                  className="rounded-md text-(--ui-text-tertiary) hover:text-foreground"
-                  size="icon-xs"
-                  variant="ghost"
-                >
-                  <Codicon name="add" />
-                </Button>
-              </DropdownMenuTrigger>
-            </Tip>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
-                <Codicon className="mr-1.5" name="hubot" />
-                {b.bot.newTitle}
+          <DropdownMenuContent align="end">
+            {(
+              [
+                ['all', b.roster.botsAndGroups],
+                ['bots', b.roster.botsOnly],
+                ['groups', b.roster.groupsOnly]
+              ] as [RosterKindFilter, string][]
+            ).map(([value, label]) => (
+              <DropdownMenuItem key={`kind:${value}`} onSelect={() => setRowKindFilter(value)}>
+                <span className="min-w-0 flex-1">{label}</span>
+                {rowKindFilter === value ? <Codicon name="check" /> : null}
               </DropdownMenuItem>
-              <NewGroupChatItem label={b.group.newTitle} onSelect={() => setGroupCreateOpen(true)} roster={roster} />
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setSectionDialog({ mode: 'create' })}>
-                <Codicon className="mr-1.5" name="new-folder" />
-                {b.sections.newSection}
+            ))}
+            <DropdownMenuSeparator />
+            {(
+              [
+                ['all', b.roster.anyActivity],
+                ['active', b.roster.activeNow],
+                ['recent', b.roster.recentlyActive],
+                ['older', b.roster.older]
+              ] as [RosterActivityFilter, string][]
+            ).map(([value, label]) => (
+              <DropdownMenuItem key={`activity:${value}`} onSelect={() => setActivityFilter(value)}>
+                <span className="min-w-0 flex-1">{label}</span>
+                {activityFilter === value ? <Codicon name="check" /> : null}
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      {showRosterTools ? (
-        <div className="flex min-w-0 items-center gap-1 px-2.5 pb-1.5">
-          {showRosterSearch ? (
-            <SearchField
-              aria-label={b.roster.search}
-              containerClassName={cn('min-w-0 flex-1', query ? 'opacity-100!' : 'opacity-50 focus-within:opacity-100')}
-              inputClassName="w-full text-[0.75rem] placeholder:text-(--ui-text-tertiary)"
-              key={'roster-search'}
-              onChange={setQuery}
-              placeholder={b.roster.searchPlaceholder}
-              value={query}
-            />
-          ) : (
-            <span className="min-w-0 flex-1" key={'roster-search-spacer'} />
-          )}
-          {showRosterFilters ? (
-            <DropdownMenu key={'roster-filters'}>
-              <Tip label={activeFilterCount ? `Filters (${activeFilterCount} active)` : 'Filter roster'}>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    aria-label={activeFilterCount ? `Filter roster, ${activeFilterCount} active` : 'Filter roster'}
-                    className={cn(
-                      'size-7 shrink-0 rounded-md text-(--ui-text-tertiary) hover:text-foreground',
-                      activeFilterCount && 'text-(--ui-accent)'
-                    )}
-                    size="icon-xs"
-                    variant="ghost"
-                  >
-                    <Codicon name="list-filter" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </Tip>
-              <DropdownMenuContent align="end">
-                {(
-                  [
-                    ['all', b.roster.botsAndGroups],
-                    ['bots', b.roster.botsOnly],
-                    ['groups', b.roster.groupsOnly]
-                  ] as [RosterKindFilter, string][]
-                ).map(([value, label]) => (
-                  <DropdownMenuItem key={`kind:${value}`} onSelect={() => setRowKindFilter(value)}>
-                    <span className="min-w-0 flex-1">{label}</span>
-                    {rowKindFilter === value ? <Codicon name="check" /> : null}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                {(
-                  [
-                    ['all', b.roster.anyActivity],
-                    ['active', b.roster.activeNow],
-                    ['recent', b.roster.recentlyActive],
-                    ['older', b.roster.older]
-                  ] as [RosterActivityFilter, string][]
-                ).map(([value, label]) => (
-                  <DropdownMenuItem key={`activity:${value}`} onSelect={() => setActivityFilter(value)}>
-                    <span className="min-w-0 flex-1">{label}</span>
-                    {activityFilter === value ? <Codicon name="check" /> : null}
-                  </DropdownMenuItem>
-                ))}
-                {gatewayOptions.length > 1 ? <DropdownMenuSeparator /> : null}
-                {gatewayOptions.length > 1 ? (
-                  <DropdownMenuItem onSelect={() => setGatewayFilter('all')}>
-                    <Codicon className="mr-1.5" name="globe" />
-                    <span className="min-w-0 flex-1">All gateways</span>
-                    {gatewayFilter === 'all' ? <Codicon name="check" /> : null}
-                  </DropdownMenuItem>
-                ) : null}
-                {gatewayOptions.length > 1
-                  ? gatewayOptions.map(option => {
-                      const status = botSourceStatus({
-                        sourceError: option.error,
-                        sourceReachable: option.reachable
-                      })
+            ))}
+            {gatewayOptions.length > 1 ? <DropdownMenuSeparator /> : null}
+            {gatewayOptions.length > 1 ? (
+              <DropdownMenuItem onSelect={() => setGatewayFilter('all')}>
+                <Codicon className="mr-1.5" name="globe" />
+                <span className="min-w-0 flex-1">All gateways</span>
+                {gatewayFilter === 'all' ? <Codicon name="check" /> : null}
+              </DropdownMenuItem>
+            ) : null}
+            {gatewayOptions.length > 1
+              ? gatewayOptions.map(option => {
+                  const status = botSourceStatus({
+                    sourceError: option.error,
+                    sourceReachable: option.reachable
+                  })
 
-                      return (
-                        <DropdownMenuItem
-                          key={option.connectionId}
-                          onSelect={() => setGatewayFilter(option.connectionId)}
-                        >
-                          <GatewayKindGlyph
-                            className={cn('mr-1.5', !status.available && 'text-amber-600 dark:text-amber-300')}
-                            kind={option.kind}
-                          />
-                          <span className="min-w-0 flex-1 truncate">{option.label || option.connectionId}</span>
-                          <span className="text-[0.625rem] tabular-nums text-(--ui-text-quaternary)">
-                            {option.count}
-                          </span>
-                          {gatewayFilter === option.connectionId ? <Codicon name="check" /> : null}
-                        </DropdownMenuItem>
-                      )
-                    })
-                  : []}
-                {activeFilterCount ? <DropdownMenuSeparator /> : null}
-                {activeFilterCount ? (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      setRowKindFilter('all')
-                      setActivityFilter('all')
-                      setGatewayFilter('all')
-                    }}
-                  >
-                    {b.roster.clearFilters}
-                  </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-        </div>
+                  return (
+                    <DropdownMenuItem
+                      key={option.connectionId}
+                      onSelect={() => setGatewayFilter(option.connectionId)}
+                    >
+                      <GatewayKindGlyph
+                        className={cn('mr-1.5', !status.available && 'text-amber-600 dark:text-amber-300')}
+                        kind={option.kind}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{option.label || option.connectionId}</span>
+                      <span className="text-[0.625rem] tabular-nums text-(--ui-text-quaternary)">
+                        {option.count}
+                      </span>
+                      {gatewayFilter === option.connectionId ? <Codicon name="check" /> : null}
+                    </DropdownMenuItem>
+                  )
+                })
+              : []}
+            {activeFilterCount ? <DropdownMenuSeparator /> : null}
+            {activeFilterCount ? (
+              <DropdownMenuItem
+                onSelect={() => {
+                  setRowKindFilter('all')
+                  setActivityFilter('all')
+                  setGatewayFilter('all')
+                }}
+              >
+                {b.roster.clearFilters}
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
       ) : null}
-    </>
+    </div>
   )
 }

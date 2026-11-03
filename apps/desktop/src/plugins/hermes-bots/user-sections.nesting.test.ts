@@ -438,10 +438,17 @@ describe('nested sections — what the roster draws', () => {
       'Team',
       'Engineering'
     ])
-    expect(visibleSectionBlocks(blocksFor(), { collapsed: open, dragging: 'legacy::x', nested: true })).toHaveLength(5)
+    expect(names(visibleSectionBlocks(blocksFor(), { collapsed: open, dragging: 'legacy::x', nested: true }))).toEqual([
+      'Studio',
+      'Team',
+      'Engineering',
+      'Clients',
+      'Personal',
+      'Unassigned'
+    ])
   })
 
-  it('an empty Unassigned is drawn only while a folder is dragged, as the end-of-top-level target', async () => {
+  it('an empty Unassigned is drawn while a folder, bot, or pin is dragged (drop / unpin target)', async () => {
     const { personal } = studioTree()
 
     await moveBotsToSection([bot('pm')], personal.id)
@@ -450,7 +457,8 @@ describe('nested sections — what the roster draws', () => {
       names(visibleSectionBlocks(blocksFor(), { collapsed: open, dragging, nested: false }))
 
     expect(visible(null)).not.toContain('Unassigned')
-    expect(visible('legacy::pm')).not.toContain('Unassigned')
+    expect(visible('legacy::pm')).toContain('Unassigned')
+    expect(visible('pin:legacy::pm')).toContain('Unassigned')
     expect(visible(`${SECTION_DRAG_PREFIX}${personal.id}`)).toContain('Unassigned')
   })
 })

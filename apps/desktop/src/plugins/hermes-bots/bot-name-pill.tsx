@@ -4,7 +4,7 @@
  * resolvable roster owner on screen.
  */
 
-import { cn, Codicon, RowButton, Tip, useValue } from '@hermes/plugin-sdk'
+import { cn, Codicon, RowButton, useValue } from '@hermes/plugin-sdk'
 
 import { avatarColor, botAppearance, BotFace } from './avatar'
 import { isBackfilledFacePng } from './avatar-image'
@@ -43,30 +43,29 @@ export function BotNamePill() {
       className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-3"
       data-slot="bot-name-pill"
     >
-      <Tip label={label}>
-        <RowButton
-          aria-expanded={open}
-          aria-label={b.bot.editMenu}
-          className={cn(
-            'pointer-events-auto flex max-w-full items-center gap-2 rounded-full border border-(--stroke-nous)',
-            'bg-(--ui-widget-surface-background) px-2.5 py-1 shadow-nous',
-            'text-[0.8125rem] font-medium text-(--ui-text-primary)',
-            'transition-colors hover:bg-(--chrome-action-hover) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-accent)'
-          )}
-          onClick={() => toggleBotDetails()}
-        >
-          <BotFace
-            color={avatarColor(color, bot.name)}
-            image={photo ? image : null}
-            mood="idle"
-            name={bot.name}
-            shape={shape}
-            size={22}
-          />
-          <span className="min-w-0 truncate">{label}</span>
-          <Codicon className="shrink-0 text-[0.625rem] text-(--ui-text-quaternary)" name="chevron-right" />
-        </RowButton>
-      </Tip>
+      <RowButton
+        aria-expanded={open}
+        aria-label={b.bot.editMenu}
+        className={cn(
+          'pointer-events-auto flex max-w-[min(100%,18rem)] items-center gap-2 rounded-full border border-(--stroke-nous)',
+          'bg-(--ui-widget-surface-background) px-2.5 py-1 shadow-nous',
+          'text-[0.8125rem] font-medium text-(--ui-text-primary)',
+          'transition-colors hover:bg-(--chrome-action-hover) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-accent)'
+        )}
+        onClick={() => toggleBotDetails()}
+        title={label}
+      >
+        <BotFace
+          color={avatarColor(color, bot.name)}
+          image={photo ? image : null}
+          mood="idle"
+          name={bot.name}
+          shape={shape}
+          size={22}
+        />
+        <span className="min-w-0 truncate">{label}</span>
+        <Codicon className="shrink-0 text-[0.625rem] text-(--ui-text-quaternary)" name="chevron-right" />
+      </RowButton>
     </div>
   )
 }

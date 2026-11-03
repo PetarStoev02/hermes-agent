@@ -1,11 +1,15 @@
 import { host } from '@hermes/plugin-sdk'
 import type { ReactNode } from 'react'
 
-import { botRosterKey } from './data'
+import { $botMeta, botRosterKey } from './data'
+import { isBotPinned } from './hidden-bots'
 import type { useBots } from './i18n'
+import { displayName } from './labels'
+import { setBotPinned } from './pinned-bots'
 import type { RosterGroupRow } from './roster-pane-derivation'
 import { GatewayKindGlyph, GatewaySectionHeading, RosterSectionHeader } from './roster-sections'
 import type { ResolvedRosterGatewaySection } from './roster-sections'
+import { botRosterMeta } from './routing'
 import type { BotMeta, GroupChat, GroupMember, RosterRow } from './types'
 import type { $botSections, BotSection, SectionBlock, SectionDialogState } from './user-sections'
 import {
@@ -97,9 +101,20 @@ export function rosterSectionRenderers({
   // indented under it, and group the flat list when there is only one.
   // `keyPrefix` keeps row keys unique across the gateway buckets.
   const renderUserSections = (rows: UserSectionRow[], keyPrefix = '') => {
-    // No sections made: the plain list, exactly as before this feature.
+    // No sections made: the plain list — still a drop target so a pinned bot
+    // can be dragged here to unpin (and land unassigned).
     if (!userSections.length) {
-      return rows.map(row => (row.kind === 'group' ? renderGroupRow(row) : renderBotRow(row.bot, keyPrefix)))
+      return (
+        <SectionDropZone
+          isSource={false}
+          key={`${keyPrefix}flat-list`}
+          onDropBot={dragKey => dropOnSection(dragKey, null, roster, b)}
+        >
+          <div className="grid min-w-0 gap-0.5">
+            {rows.map(row => (row.kind === 'group' ? renderGroupRow(row) : renderBotRow(row.bot, keyPrefix)))}
+          </div>
+        </SectionDropZone>
+      )
     }
 
     const nested = Boolean(keyPrefix)
@@ -136,7 +151,7 @@ export function rosterSectionRenderers({
         indent={block.depth + (nested ? 1 : 0)}
         isSource={isDropSource(block, dragging, userSections)}
         key={key}
-        onDropBot={dragKey => dropOnSection(dragKey, block.id, roster)}
+        onDropBot={dragKey => dropOnSection(dragKey, block.id, roster, b)}
       >
         <UserSectionHeader
           canMoveDown={order >= 0 && order < siblings.length - 1}
@@ -234,6 +249,15 @@ export function rosterSectionRenderers({
   return { renderUserSections, renderGatewaySection, renderGroupChatSection, renderHiddenGatewaySection }
 }
 
+/** Strip the `pin:` prefix pin-grid drags use so folder targets see a roster key. */
+function rosterKeyFromDrag(dragging: null | string): null | string {
+  if (!dragging) {
+    return null
+  }
+
+  return dragging.startsWith('pin:') ? dragging.slice('pin:'.length) : dragging
+}
+
 /** Whether a drag in flight may NOT drop on this block: a bot or group already
  *  filed here, or — for a folder in flight — the folder itself or anything
  *  inside it (that would make a loop). */
@@ -248,16 +272,19 @@ function isDropSource(block: SectionBlock<UserSectionRow>, dragging: null | stri
     return Boolean(block.id) && !botSectionParentOptions(id, sections).some(section => section.id === block.id)
   }
 
+  const key = rosterKeyFromDrag(dragging)
+
   return block.rows.some(row =>
-    row.kind === 'group' ? groupDragKey(row.name) === dragging : botRosterKey(row.bot) === dragging
+    row.kind === 'group' ? groupDragKey(row.name) === key : botRosterKey(row.bot) === key
   )
 }
 
 /** Whatever was dragged, filed onto this block (`null` = Unassigned). A folder
  *  dropped on a folder lands just before it, at its level; on Unassigned it
  *  goes to the end of the top level. Bots and groups move into the block —
- *  `null` is exactly what both movers want for "clear the assignment". */
-function dropOnSection(dragKey: string, sectionId: null | string, roster: RosterRow[]): void {
+ *  `null` is exactly what both movers want for "clear the assignment".
+ *  A pin-grid drag also unpins so the bot reappears in the folder. */
+function dropOnSection(dragKey: string, sectionId: null | string, roster: RosterRow[], b?: ReturnType<typeof useBots>): void {
   if (dragKey.startsWith(SECTION_DRAG_PREFIX)) {
     const id = dragKey.slice(SECTION_DRAG_PREFIX.length)
 
@@ -278,9 +305,25 @@ function dropOnSection(dragKey: string, sectionId: null | string, roster: Roster
 
   const bot = roster.find(row => botRosterKey(row) === dragKey)
 
-  if (bot) {
-    void moveBotsToSection([bot], sectionId)
+  if (!bot) {
+    return
   }
+  void (async () => {
+    const meta = $botMeta.get()
+
+    if (isBotPinned(bot, meta)) {
+      await setBotPinned(bot, false, meta)
+
+      if (b) {
+        host.notify({
+          kind: 'info',
+          message: b.bot.unpinnedToast(displayName(bot, botRosterMeta(bot, meta)))
+        })
+      }
+    }
+
+    await moveBotsToSection([bot], sectionId)
+  })()
 }
 
 /** Swap `self` with the neighbour drawn next to it, which may not be its
