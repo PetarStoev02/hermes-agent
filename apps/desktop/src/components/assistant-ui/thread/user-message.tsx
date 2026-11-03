@@ -17,6 +17,7 @@ import { MessageTimelineTimestamp } from '@/components/assistant-ui/thread/timel
 import { type RestoreMessageTarget } from '@/components/assistant-ui/thread/types'
 import { useMessageReactions } from '@/components/assistant-ui/thread/use-message-reactions'
 import { UserMessageText } from '@/components/assistant-ui/thread/user-message-text'
+import { $workspaceMode } from '@/components/pane-shell/workspace-scope'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
@@ -463,6 +464,7 @@ export const UserMessage: FC<{
   const { t } = useI18n()
   const copy = t.assistant.thread
   const touch = useStore($touchPointer)
+  const botsChat = useStore($workspaceMode) === 'bots'
   const messageId = useAuiState(s => s.message.id)
   const content = useAuiState(s => s.message.content)
   const messageText = messageContentText(content)
@@ -544,7 +546,10 @@ export const UserMessage: FC<{
   const bubbleClassName = cn(
     USER_BUBBLE_BASE_CLASS,
     'cursor-pointer pr-9 text-[length:var(--conversation-text-font-size)] leading-(--dt-line-height) text-foreground/95 transition-colors',
-    'border-(--ui-stroke-tertiary) hover:border-(--ui-stroke-secondary)'
+    'border-(--ui-stroke-tertiary) hover:border-(--ui-stroke-secondary)',
+    // Grok-style dark right pill in Bot Mode — attribute drives CSS that
+    // must beat the glass/theme bubble utilities above.
+    botsChat && 'bot-mode-user-bubble'
   )
 
   const bubbleContent = hasBody ? (

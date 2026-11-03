@@ -1985,6 +1985,65 @@ body.guest-pointer-lock :is(webview, iframe) {
   padding-top: 2.75rem;
 }
 
+/* Bot Mode chat: Grok-like layout — compact right user pills, soft left
+   assistant bubbles. Composer stays Hermes (plan decision). Classes are also
+   stamped from React (`.bot-mode-user-bubble` / `.bot-mode-assistant-bubble`)
+   so the look does not depend only on the surface attribute cascade. */
+[data-chat-surface][data-workspace-mode='bots'] .human-message-with-todos-wrapper {
+  align-items: flex-end;
+}
+
+[data-chat-surface][data-workspace-mode='bots'] .composer-human-message.bot-mode-user-bubble,
+.composer-human-message.bot-mode-user-bubble {
+  width: fit-content;
+  max-width: min(85%, 26rem);
+  margin-inline-start: auto;
+  border-radius: 1.25rem;
+  /* Ink fill + opaque page chrome as text. Do NOT use
+     --ui-chat-surface-background here — wallpaper/plugin themes set it to
+     transparent, which made the dark pill look empty. --background stays a
+     solid-ish card color in both light and dark, so the invert still reads. */
+  background: color-mix(in srgb, var(--ui-base) 92%, transparent) !important;
+  color: var(--background) !important;
+  border-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none;
+}
+
+[data-chat-surface][data-workspace-mode='bots'] .composer-human-message.bot-mode-user-bubble:hover,
+.composer-human-message.bot-mode-user-bubble:hover {
+  border-color: transparent !important;
+}
+
+[data-chat-surface][data-workspace-mode='bots'] .composer-human-message.bot-mode-user-bubble :is(a, code, pre),
+.composer-human-message.bot-mode-user-bubble :is(a, code, pre) {
+  color: inherit;
+}
+
+[data-chat-surface][data-workspace-mode='bots'] .composer-human-message.bot-mode-user-bubble code,
+.composer-human-message.bot-mode-user-bubble code {
+  background: color-mix(in srgb, var(--background) 18%, transparent);
+}
+
+[data-chat-surface][data-workspace-mode='bots'] .bot-mode-user-bubble [data-slot='aui_user-bubble-actions'] .absolute,
+.bot-mode-user-bubble ~ .absolute,
+[data-chat-surface][data-workspace-mode='bots'] [data-slot='aui_user-bubble-actions'] .absolute {
+  /* Restore/stop overlays on the dark pill — keep them readable. */
+  color: color-mix(in srgb, var(--background) 85%, transparent);
+}
+
+[data-chat-surface][data-workspace-mode='bots'] [data-slot='bot-assistant-bubble'].bot-mode-assistant-bubble,
+.bot-mode-assistant-bubble {
+  display: block;
+  width: fit-content;
+  max-width: min(92%, 32rem);
+  border-radius: 1.125rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--ui-bg-tertiary, var(--ui-bg-quaternary));
+  color: var(--ui-text-primary);
+}
+
 [data-slot='aui_intro'] {
   align-items: center;
   justify-content: center;

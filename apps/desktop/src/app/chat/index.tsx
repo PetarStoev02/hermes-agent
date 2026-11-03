@@ -16,6 +16,7 @@ import { $introHoldsThread } from '@/components/onboarding/first-run/intro'
 import { IntroCopy } from '@/components/onboarding/first-run/intro-copy'
 import { usePaneGroup, usePaneVisible } from '@/components/pane-shell/pane-visibility'
 import { $hoveredTreeGroup, $sessionTileDragging, $sessionTileEdgeHover } from '@/components/pane-shell/tree/store'
+import { $workspaceMode } from '@/components/pane-shell/workspace-scope'
 import { PromptOverlays } from '@/components/prompt-overlays'
 import { TitleMenuTrigger } from '@/components/ui/title-menu-trigger'
 import { type HermesGateway, type ResolvedOwner } from '@/hermes'
@@ -743,6 +744,7 @@ const ChatViewContent = memo(function ChatViewContent({
   // here is the WHOLE surface — thread, composer, header — per mounted tile.
   const sessionDragging = useStore($sessionTileDragging)
   const sessionEdgeHover = useStore($sessionTileEdgeHover)
+  const workspaceMode = useStore($workspaceMode)
 
   const overlayKind = dropOverlayKind(dragKind, sessionDragging, sessionEdgeHover)
 
@@ -759,6 +761,7 @@ const ChatViewContent = memo(function ChatViewContent({
       data-guide-arrived={isPrimary && guideStarted ? '' : undefined}
       data-session-anchor={sessionAnchor}
       data-setup-chat={setupChat ? '' : undefined}
+      data-workspace-mode={workspaceMode}
     >
       <Backdrop />
       {/* Tiles get their chrome from the layout zone (chip strip); the modal

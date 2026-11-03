@@ -27,6 +27,7 @@ import { formatElapsed, useElapsedSeconds, useMeasuredDuration } from '@/compone
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { GeneratedImage } from '@/components/chat/generated-image-result'
 import { SCAFFOLD_LABEL_CLASS, SCAFFOLD_META_CLASS, ScaffoldRow } from '@/components/chat/scaffold-row'
+import { $workspaceMode } from '@/components/pane-shell/workspace-scope'
 import { useI18n } from '@/i18n'
 import { mcpTargets, toolLabels } from '@/lib/connector-tools'
 import { generatedImageFromResult } from '@/lib/generated-images'
@@ -201,6 +202,7 @@ type TimelineTextPartProps = TextMessagePartProps & { completedAt?: number; time
 
 const TimelineMarkdownText: FC<TimelineTextPartProps> = ({ completedAt, timestamp }) => {
   const { text } = useMessagePartText()
+  const botsChat = useStore($workspaceMode) === 'bots'
 
   // assistant-ui adds an empty continuation after a tool starts. It is not
   // prose yet and must not create paragraph spacing above pending approvals.
@@ -211,10 +213,14 @@ const TimelineMarkdownText: FC<TimelineTextPartProps> = ({ completedAt, timestam
   return (
     <>
       <TimelineTimestamp className="mb-0.5 block" completedAt={completedAt} timestamp={timestamp} />
-      {/* Soft Grok-style bubble around assistant prose only — tools stay outside. */}
-      <div className="max-w-[min(100%,36rem)] rounded-2xl bg-(--ui-bg-quaternary) px-3.5 py-2.5">
+      {botsChat ? (
+        // Soft Grok-style bubble around assistant prose only — tools stay outside.
+        <div className="bot-mode-assistant-bubble" data-slot="bot-assistant-bubble">
+          <MarkdownText />
+        </div>
+      ) : (
         <MarkdownText />
-      </div>
+      )}
     </>
   )
 }
