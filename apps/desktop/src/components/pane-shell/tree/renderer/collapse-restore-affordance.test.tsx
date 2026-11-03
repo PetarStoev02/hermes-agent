@@ -132,6 +132,15 @@ describe('Sessions/Bots strip — #91223', () => {
 
     expect(tablist()).toBeNull()
   })
+
+  it('Sessions/Bots strip has no minimize chevron — hide-only chrome is not a collapsible tool pane', () => {
+    render(<LiveTreeGroup parentAxis="row" />)
+
+    const strip = globalThis.document.querySelector('[data-zone-tabstrip="g-side"]')
+    expect(strip).toBeTruthy()
+    expect(strip?.querySelector('[aria-label="Minimize"]')).toBeNull()
+    expect(strip?.querySelector('.codicon-chevron-down')).toBeNull()
+  })
 })
 
 describe('docked tool tile — collapsing keeps the restore chip', () => {

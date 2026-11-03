@@ -574,8 +574,12 @@ export function TreeGroup({
   }
 
   // The zone hosting the uncloseable workspace never minimizes — collapsing
-  // MAIN strands the whole app behind a strip.
-  const minimizable = !shown.some(id => paneChrome(paneFor(id)).uncloseable)
+  // MAIN strands the whole app behind a strip. Hide-only chrome (Sessions /
+  // Bots) also skips the chevron: those tabs are show/hide standing chrome,
+  // and a minimize control on that strip is just noise next to the labels.
+  const minimizable =
+    !shown.some(id => paneChrome(paneFor(id)).uncloseable) &&
+    !shown.every(id => Boolean(paneChrome(paneFor(id)).hideOnly))
 
   // Middle-click / ⌘-click on a tab: one routing for every tab kind, the same
   // one the zone menu's Close and ⌘W use.
