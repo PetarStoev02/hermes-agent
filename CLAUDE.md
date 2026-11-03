@@ -20,6 +20,7 @@ add to it.
     gradient). Change the icon there and regenerate; never hand-edit the PNG/ICNS outputs. After
     regenerating, restore files outside `apps/desktop/` (renderer version drift) and
     `apps/desktop/packaging/dmg-volume.icns`.
+- **Plans for upcoming work** live in `plans/` (only on `local`). Start with `plans/bots-redesign/PLAN.md`.
 - Upstream tests that pin the official identity or icon flavors fail on `local`; that is expected.
 
 ## Update and rebuild
