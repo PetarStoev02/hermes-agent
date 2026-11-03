@@ -34,6 +34,7 @@ import {
   registerPaneCloser,
   removeTreePane,
   revealTreePane,
+  setStripTabHidden,
   undismissTreePanes
 } from '@/components/pane-shell/tree/store'
 import {
@@ -1325,6 +1326,19 @@ export const host = {
     }
 
     revealTreePane(id)
+  },
+
+  /** Show/hide a hide-only chrome tab (sessions / Bots). Returns false when
+   *  the hide would leave the zone with no visible tab. Feature-detect on
+   *  older desktops (`typeof host.setStripTabHidden === 'function'`). */
+  setStripTabHidden: (paneId: string, hidden: boolean): boolean => {
+    const id = (paneId ?? '').trim()
+
+    if (!id) {
+      return false
+    }
+
+    return setStripTabHidden(id, hidden)
   },
 
   /** HEAR the gateway stream (message deltas, session lifecycle, tool

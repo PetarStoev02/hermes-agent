@@ -39,6 +39,7 @@ import {
   $selectedRosterKey,
   focusedMentionProfile
 } from './bot-state'
+import { startBotsFirstSidebar } from './bots-first-sidebar'
 import { isCanonicalChatOnScreen, openBotCanonicalChat } from './canonical-chat'
 import { BotChatEmpty } from './chat-empty'
 import { bindProfileSync } from './cron'
@@ -434,6 +435,9 @@ export default {
     // the meta/room storage hydrates above have landed; idempotent after that.
     // (Feature-guarded: bare vm test harnesses have no setTimeout global.)
     startHideSweepScheduler(ctx)
+    // Bots-first: Sessions stays available via Show tab / ⌘K, but the left
+    // chrome opens on Bots alone (coding is T3 Code; this window is agents).
+    startBotsFirstSidebar(ctx)
     // Sessions sidebar: each gateway/profile group gets the profile's Screen portal
     // above its sessions, so the bot's computer is reachable from either mode.
     ctx.register({
