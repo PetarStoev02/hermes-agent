@@ -278,6 +278,14 @@ export type BotsMessages = {
     pictureGenerationFailed: string
     nameTaken: (name: string) => string
     memberCount: (count: number) => string
+    /** Details-panel tab: list of bots seated in the room. */
+    membersLabel: string
+    /** Empty Members tab copy. */
+    noMembers: string
+    /** Open the member picker from the Members tab. */
+    manageMembers: string
+    /** Aria label for closing the group details panel. */
+    closeDetails: string
     /** The reader's own lines in a room: the transcript speaker and the roster preview. */
     you: string
     /** How many of a room's members are reachable right now. */

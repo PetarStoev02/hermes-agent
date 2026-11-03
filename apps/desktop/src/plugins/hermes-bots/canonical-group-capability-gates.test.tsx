@@ -2,7 +2,7 @@ import type * as HermesSdk from '@hermes/plugin-sdk'
 import { host } from '@hermes/plugin-sdk'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { WritableAtom } from 'nanostores'
-import { useSyncExternalStore } from 'react'
+import { type ReactNode, useSyncExternalStore } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { CANONICAL_GROUP_LOCALES } from './canonical-group-locales'
@@ -15,7 +15,7 @@ import type * as GroupChatParts from './group-chat-parts'
 import { GroupChatWorkspace } from './group-chat-view'
 import { botsText } from './i18n'
 import { translateBots } from './i18n-test-helper'
-import { renderRosterToolbar } from './roster-pane-toolbar'
+import { RosterPaneToolbar } from './roster-pane-toolbar'
 import type { RosterRow } from './types'
 
 const { request, notify, openWorkspace, activation } = vi.hoisted(() => ({ request: vi.fn(), notify: vi.fn(), openWorkspace: vi.fn(), activation: { epoch: 1, listeners: new Set<() => void>() } }))
@@ -25,6 +25,9 @@ vi.mock('@hermes/plugin-sdk', async importOriginal => {
 
   return {
     ...sdk,
+    // Toolbar projects into titleBar.left; pass through so the New… trigger
+    // stays in the test tree without mounting a Slot.
+    Contribute: ({ children }: { children: ReactNode }) => <>{children}</>,
     gatewayActivationEpoch: () => activation.epoch,
     // The hook subscribes, like the real store: an epoch that moves re-renders its readers.
     useGatewayActivationEpoch: () => useSyncExternalStore(
@@ -209,9 +212,12 @@ it('keeps positive classifications working: legacy renders and creates locally, 
   cleanup()
 
   answer({ driver: true, persistent_process: true })
+  vi.mocked(updateGroupChat).mockClear()
   const { onCreated } = await submitDialog()
   expect(onCreated).toHaveBeenCalledOnce()
-  expect(Object.values($canonicalGroupBindings.get())).toHaveLength(1)
+  // Key + name alias for the same room (folder GroupRow opens by name).
+  expect(Object.keys($canonicalGroupBindings.get()).filter(k => k.startsWith('canonical:'))).toHaveLength(1)
+  expect(Object.keys($canonicalGroupBindings.get()).filter(k => k.startsWith('alias:'))).toHaveLength(1)
   expect(updateGroupChat).toHaveBeenCalledOnce()
   expect(request.mock.calls.filter(call => call[1] === 'groups.create')).toHaveLength(1)
 })
@@ -412,28 +418,28 @@ it.each([
   const setGroupCreateOpen = vi.fn()
 
   render(
-    renderRosterToolbar({
-      activeFilterCount: 0,
-      activeSourceRoster: withParked,
-      activityFilter: 'all',
-      activityToasts: false,
-      b: botsText(),
-      gatewayFilter: 'all',
-      gatewayOptions: [],
-      query: '',
-      roster: withParked,
-      rowKindFilter: 'all',
-      setActivityFilter: vi.fn(),
-      setCreateOpen: vi.fn(),
-      setGatewayFilter: vi.fn(),
-      setGroupCreateOpen,
-      setQuery: vi.fn(),
-      setRowKindFilter: vi.fn(),
-      setSectionDialog: vi.fn(),
-      showRosterFilters: false,
-      showRosterSearch: false,
-      showRosterTools: false
-    })
+    <RosterPaneToolbar
+      activeFilterCount={0}
+      activeSourceRoster={withParked}
+      activityFilter="all"
+      activityToasts={false}
+      b={botsText()}
+      gatewayFilter="all"
+      gatewayOptions={[]}
+      query=""
+      roster={withParked}
+      rowKindFilter="all"
+      setActivityFilter={vi.fn()}
+      setCreateOpen={vi.fn()}
+      setGatewayFilter={vi.fn()}
+      setGroupCreateOpen={setGroupCreateOpen}
+      setQuery={vi.fn()}
+      setRowKindFilter={vi.fn()}
+      setSectionDialog={vi.fn()}
+      showRosterFilters={false}
+      showRosterSearch={false}
+      showRosterTools={false}
+    />
   )
 
   fireEvent.keyDown(screen.getByRole('button', { name: botsText().roster.newBotOrGroup }), { key: 'Enter' })

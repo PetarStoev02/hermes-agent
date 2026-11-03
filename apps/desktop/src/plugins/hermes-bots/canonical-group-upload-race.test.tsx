@@ -15,8 +15,14 @@ vi.mock('@hermes/plugin-sdk', async () => {
     useI18n: () => ({ t: en }),
     usePluginI18n: () => (key: string) => CANONICAL_GROUP_LOCALES.en[key.replace('canonical.', '') as keyof typeof CANONICAL_GROUP_LOCALES.en] ?? key,
     Button: (p: ComponentProps<'button'>) => <button {...p} />,
+    RowButton: (p: ComponentProps<'button'>) => <button type="button" {...p} />,
     host: { ...gateway.host, requestProfile: request } }
 })
+vi.mock('./avatar', () => ({
+  avatarColor: () => '#000',
+  botAppearance: () => ({ shape: 'hex', color: '#000', image: null }),
+  BotFace: () => null
+}))
 import { CanonicalGroupWorkspace } from './canonical-group-workspace'
 const originalDesktop = window.hermesDesktop
 beforeEach(() => { Object.defineProperty(window, 'hermesDesktop', { configurable: true, writable: true, value: undefined }) })

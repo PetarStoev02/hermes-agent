@@ -20,6 +20,11 @@ vi.mock('@hermes/plugin-sdk', async () => {
     RowButton: (p: ComponentProps<'button'>) => <button type="button" {...p} />,
     host: { ...gateway.host, requestProfile: request } }
 })
+vi.mock('./avatar', () => ({
+  avatarColor: () => '#000',
+  botAppearance: () => ({ shape: 'hex', color: '#000', image: null }),
+  BotFace: () => null
+}))
 import { host } from '@hermes/plugin-sdk'
 
 import { $canonicalGroupBindings, CanonicalGroupList, registerCanonicalGroup } from './canonical-group-registry'
@@ -196,9 +201,11 @@ it('shows which bots are working, and still says the group is working on a gatew
   expect([phase('Ops'), phase('QA')]).toEqual(['working', 'queued'])
 
   // The same mounted room clears both indicators on its next poll once the turn settles.
+  // Idle roster stays off the island so it does not read as a second title.
   driver = { working: false, member_activity: [] }
   await waitFor(() => expect(screen.queryByRole('status')).toBeNull(), { timeout: 5_000 })
-  expect([phase('Ops'), phase('QA')]).toEqual(['idle', 'idle'])
+  expect(screen.queryByText('Ops')).toBeNull()
+  expect(screen.queryByText('QA')).toBeNull()
 
   view.unmount()
   driver = { working: true }
@@ -232,13 +239,35 @@ it('describes only a send restored from the journal as restored, never an ordina
 it('renames the room and disbands it only through ConfirmDialog, which stays open with a failed disband\'s error', async () => {
   const onBack = vi.fn()
   let disbands = 0
-  request.mockImplementation(async (_route, method) => roomReads()(method)
-    ?? (method === 'groups.disband' && ++disbands === 1 ? Promise.reject(new Error('disband failed')) : {}))
+  let roomName = 'Room'
+  request.mockImplementation(async (_route, method, params) => {
+    if (method === 'groups.rename') {
+      roomName = String(params?.name || roomName)
+
+      return {}
+    }
+
+    if (method === 'groups.state') {return { room: { name: roomName, room_id: 'controls', members: [] }, driver_status: {} }}
+
+    if (method === 'groups.log') {return { events: [] }}
+
+    if (method === 'groups.disband' && ++disbands === 1) {return Promise.reject(new Error('disband failed'))}
+
+    return {}
+  })
+  const { mirrorCanonicalRoom } = await import('./canonical-group-registry')
+  const { $groupChats } = await import('./group-chat')
+  mirrorCanonicalRoom({ connectionId: 'remote', profile: 'team' }, { room_id: 'controls', name: 'Room', members: [] })
   render(<CanonicalGroupWorkspace binding={{ connectionId: 'remote', profile: 'team', roomId: 'controls' }} onBack={onBack} />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Rename' }))
-  fireEvent.change(screen.getByRole('textbox', { name: 'New name' }), { target: { value: ' Renamed ' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'Room' }))
+  // Plugin i18n mock returns message keys for non-canonical strings.
+  fireEvent.change(await screen.findByRole('textbox', { name: 'group.nameLabel' }), { target: { value: ' Renamed ' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(request.mock.calls.find(c => c[1] === 'groups.rename')?.[2]).toMatchObject({ room_id: 'controls', name: 'Renamed' }))
+  await waitFor(() => {
+    expect($groupChats.get().Room).toBeUndefined()
+    expect($groupChats.get().Renamed).toMatchObject({ roomId: 'controls' })
+  })
   const disband = screen.getByRole('button', { name: /disband/i }) as HTMLButtonElement
   await waitFor(() => expect(disband.disabled).toBe(false))
   fireEvent.click(disband)
@@ -258,6 +287,7 @@ it('leaves the in-panel room after a disband even though no tab supplies onBack'
   const group = registerCanonicalGroup({ connectionId: 'local', profile: 'default' }, { room_id: 'panel', name: 'Room', members: [] })
   $groupChatWorkspace.set(group)
   render(<GroupChatWorkspace group={group} members={[]} origin="key" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Room' }))
   const disband = await screen.findByRole('button', { name: /disband/i }) as HTMLButtonElement
   await waitFor(() => expect(disband.disabled).toBe(false))
   fireEvent.click(disband)
@@ -277,6 +307,7 @@ it('drops a disbanded room from the sidebar list and its bindings, with the disb
   const binding = { connectionId: 'remote', profile: 'team', roomId: 'gone', roomName: 'Doomed' }
   const key = registerCanonicalGroup(binding, room)
   render(<CanonicalGroupWorkspace binding={binding} onBack={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Room' }))
   const disband = await screen.findByRole('button', { name: /disband/i }) as HTMLButtonElement
   await waitFor(() => expect(disband.disabled).toBe(false))
   fireEvent.click(disband)
@@ -290,7 +321,7 @@ it('drops a disbanded room from the sidebar list and its bindings, with the disb
 it('@-completes room members with the exact handle the gateway resolves', async () => {
   request.mockImplementation(async (_route, method) => roomReads([{ member_id: 'm1', profile: 'ops', handle: 'ops-2', display_name: 'Ops Bot' }])(method) ?? {})
   render(<CanonicalGroupWorkspace binding={{ connectionId: 'local', profile: 'team', roomId: 'mentions' }} />)
-  await screen.findByText('Ops Bot')
+  await screen.findByRole('button', { name: 'Room' })
   await waitFor(() => expect((screen.getByRole('textbox') as HTMLTextAreaElement).disabled).toBe(false))
   fireEvent.change(screen.getByRole('textbox'), { target: { value: '@' } })
   expect(screen.getByText('@everyone')).toBeTruthy()

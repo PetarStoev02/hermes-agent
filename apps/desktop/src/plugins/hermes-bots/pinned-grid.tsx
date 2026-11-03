@@ -173,17 +173,25 @@ export function PinnedGrid({ bots, onEdit }: PinnedGridProps) {
           {b.bot.pinToTop}
         </div>
       ) : (
-        // Flex + justify-center so a short last row (2 of 4, 1 of 3, …) sits
-        // in the middle of the strip instead of hugging the left edge. Tile
-        // width stays 1/columns so a full row still fills the roster.
-        <div className="flex flex-wrap justify-center gap-1 px-0 pb-1 pt-1">
+        // Flex + justify-center so a short last row sits in the middle.
+        // Hug mode sizes each tile to the avatar; otherwise width is 1/columns.
+        <div
+          className={cn(
+            'flex flex-wrap justify-center',
+            layout.hug ? 'gap-3 px-2 pb-2 pt-2' : 'gap-1 px-0 pb-1 pt-1'
+          )}
+        >
           {bots.map(bot => (
             <div
               className="min-w-0"
               key={botRosterKey(bot)}
-              style={{
-                width: `calc((100% - ${(layout.columns - 1) * 0.25}rem) / ${layout.columns})`
-              }}
+              style={
+                layout.hug
+                  ? { width: layout.avatarSize + 28 }
+                  : {
+                      width: `calc((100% - ${(layout.columns - 1) * 0.25}rem) / ${layout.columns})`
+                    }
+              }
             >
               <PinnedTile
                 avatarSize={layout.avatarSize}

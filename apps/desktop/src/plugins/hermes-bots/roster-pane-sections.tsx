@@ -37,6 +37,8 @@ interface RosterSectionRenderersProps {
   allMeta: Record<string, BotMeta>
   groupRooms: Record<string, GroupChat>
   dragging: string | null
+  /** Search/filter active — suppress empty folders (and their drop hints). */
+  hasRosterConstraint: boolean
   rosterSectionCollapsed: (id: string) => boolean
   toggleRosterSection: (id: string) => void
   setSectionDialog: (value: SectionDialogState) => void
@@ -62,6 +64,7 @@ export function rosterSectionRenderers({
   allMeta,
   groupRooms,
   dragging,
+  hasRosterConstraint,
   rosterSectionCollapsed,
   toggleRosterSection,
   setSectionDialog,
@@ -122,6 +125,7 @@ export function rosterSectionRenderers({
 
     const visible = visibleSectionBlocks(groupRowsBySection(rows, userSections, allMeta, groupRooms), {
       collapsed: id => rosterSectionCollapsed(blockKey(id)),
+      constrained: hasRosterConstraint,
       dragging,
       nested
     })

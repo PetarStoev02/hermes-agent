@@ -27,6 +27,7 @@ import {
   host,
   Input,
   queryClient,
+  randomUuid,
   relativeTime,
   RowButton,
   Tip,
@@ -47,6 +48,7 @@ import {
   $canonicalGroupBindings,
   canonicalGroupBindingFor,
   canonicalGroupKeyRoute,
+  forgetCanonicalGroup,
   publishCanonicalGroup,
   registerCanonicalGroup,
   resolveCanonicalGroup
@@ -73,6 +75,7 @@ import {
 } from './group-activity'
 import type { GroupActivityEntry } from './group-activity'
 import { filesToGroupAttachments, pickGroupAttachments } from './group-attachments'
+import { GroupAvatarCluster } from './group-avatar-cluster'
 import {
   $groupChats,
   $groupChatWorkspace,
@@ -90,6 +93,7 @@ import { GroupClarifyCard, GroupImageControls, GroupMentionInput } from './group
 import type { GroupRoomPrompt } from './group-chat-parts'
 import { GroupMemberPicker } from './group-chat-view-members'
 import { compressGroupMemberHistory } from './group-compress'
+import { GroupDetailsPanel } from './group-details-panel'
 import { sweepExternalGroupWrites } from './group-external-writes'
 import { GroupHoldStatus } from './group-hold-status'
 import {
@@ -138,6 +142,32 @@ const MessageTextContent = typeof sdk === 'undefined' ? undefined : sdk.MessageT
  *  open. Other group memberships and the members' per-group gateway sessions
  *  ("Group: <roomId>", or legacy "Group: <name>") are intentionally KEPT. */
 export async function disbandGroupChat(group: string, members: RosterRow[]) {
+  // Gateway rooms mirrored into the folder roster: disband on their authority
+  // first. A refusal rejects before local cleanup so the GroupRow stays and
+  // the confirm dialog can show why (same contract as CanonicalGroupList).
+  const connectionId = host.state.connectionId.get()
+  const profile = host.state.profile.get()
+
+  if (connectionId) {
+    const route = { connectionId, profile }
+
+    const binding = canonicalGroupBindingFor($canonicalGroupBindings.get(), route, group, 'name')
+      || Object.values($canonicalGroupBindings.get()).find(
+        candidate =>
+          candidate.connectionId === connectionId
+          && candidate.profile === profile
+          && candidate.roomId === ($groupChats.get()[group]?.roomId || '')
+      )
+
+    if (binding?.roomId) {
+      await canonicalGroupRequest(binding, 'groups.disband', {
+        room_id: binding.roomId,
+        cancel_id: randomUuid()
+      })
+      forgetCanonicalGroup(binding)
+    }
+  }
+
   // Invalidate any in-flight round-robin FIRST: bump the epoch so a running
   // drive bails at its next member boundary instead of appending to a room
   // the user just discarded.
@@ -874,6 +904,7 @@ function LegacyGroupChatWorkspace({ group, members, onBack, visible = true }: Gr
   const [confirmDisband, setConfirmDisband] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [memberPickerOpen, setMemberPickerOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   // Click-to-disambiguate: which log entry is showing its speaker's full
   // @handle (the roster's name-device form when names collide across
   // connections). Naturally every speaker just shows its display name.
@@ -1006,70 +1037,40 @@ function LegacyGroupChatWorkspace({ group, members, onBack, visible = true }: Gr
     members.map(b => displayName(b, botRosterMeta(b, allMeta))).join(', ') || 'No bots in this group chat'
 
   const header = (
-    <div className="flex items-center gap-2 px-2.5 pt-2.5 pb-2">
-      <Button onClick={() => (onBack ? onBack() : $groupChatWorkspace.set(null))} size="sm" variant="ghost">
-        Back
-      </Button>
-      {/* Room picture (set via Group settings) leads the title when present. */}
-      {room.image ? (
-        <img
-          alt=""
-          className="size-6 shrink-0 rounded-md object-cover ring-1 ring-(--ui-stroke-secondary)"
-          src={room.image}
-        />
-      ) : (
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-(--chrome-action-hover) text-(--ui-text-tertiary)">
-          <Codicon name="organization" />
-        </span>
-      )}
-      <div className="min-w-0 flex-1 truncate text-sm font-semibold">{group}</div>
-      <Tip label={memberNames}>
-        <span
-          aria-label={availabilityLabel}
+    <>
+      <div
+        className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-3"
+        data-slot="group-name-pill"
+      >
+        <RowButton
+          aria-expanded={detailsOpen}
+          aria-label={group}
           className={cn(
-            'shrink-0 text-[0.65rem] text-(--ui-text-quaternary)',
-            members.length > 0 && availableMembers < members.length && 'text-amber-600 dark:text-amber-300'
+            'pointer-events-auto flex max-w-[min(100%,18rem)] items-center gap-2 rounded-full border border-(--stroke-nous)',
+            'bg-(--ui-widget-surface-background) px-2.5 py-1 shadow-nous',
+            'text-[0.8125rem] font-medium text-(--ui-text-primary)',
+            'transition-colors hover:bg-(--chrome-action-hover) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-accent)'
           )}
+          onClick={() => setDetailsOpen(open => !open)}
+          title={memberNames}
         >
-          {members.length > 0 && availableMembers < members.length
-            ? availabilityLabel
-            : b.group.memberCount(members.length)}
-        </span>
-      </Tip>
-      <Tip label={b.group.settingsHint(group)}>
-        <Button
-          aria-label={b.group.settingsLabel(group)}
-          className="shrink-0 text-(--ui-text-tertiary) hover:text-foreground"
-          onClick={() => setSettingsOpen(true)}
-          size="sm"
-          variant="ghost"
-        >
-          <Codicon name="gear" />
-        </Button>
-      </Tip>
-      <Tip label="Manage members">
-        <Button
-          aria-label="Manage group members"
-          className="shrink-0 text-(--ui-text-tertiary) hover:text-foreground"
-          onClick={() => setMemberPickerOpen(true)}
-          size="sm"
-          variant="ghost"
-        >
-          <Codicon name="organization" />
-        </Button>
-      </Tip>
-      <Tip label={b.group.disbandHint(group)}>
-        <Button
-          aria-label={b.group.disbandLabel(group)}
-          className="shrink-0 text-(--ui-text-tertiary) hover:text-destructive"
-          onClick={() => setConfirmDisband(true)}
-          size="sm"
-          variant="ghost"
-        >
-          <Codicon name="trash" />
-        </Button>
-      </Tip>
-    </div>
+          <GroupAvatarCluster image={room.image} members={members} size={22} />
+          <span className="min-w-0 truncate">{group}</span>
+          <Codicon className="shrink-0 text-[0.625rem] text-(--ui-text-quaternary)" name="chevron-right" />
+        </RowButton>
+      </div>
+      <div
+        aria-label={availabilityLabel}
+        className={cn(
+          'flex justify-center px-3 pt-11 text-xs text-(--ui-text-tertiary)',
+          members.length > 0 && availableMembers < members.length && 'text-amber-600 dark:text-amber-300'
+        )}
+      >
+        {members.length > 0 && availableMembers < members.length
+          ? availabilityLabel
+          : b.group.memberCount(members.length)}
+      </div>
+    </>
   )
 
   // Seat from the live sources at send time, not from the painted `members`
@@ -1120,6 +1121,44 @@ function LegacyGroupChatWorkspace({ group, members, onBack, visible = true }: Gr
       message: b.group.stopped(group)
     })
   }
+
+  const detailsPanel = detailsOpen ? (
+    <GroupDetailsPanel
+      canStop={Boolean(room.running)}
+      group={group}
+      image={room.image}
+      members={members}
+      onClose={() => setDetailsOpen(false)}
+      onDisband={() => {
+        setDetailsOpen(false)
+        setConfirmDisband(true)
+      }}
+      onManageMembers={() => {
+        setDetailsOpen(false)
+        setMemberPickerOpen(true)
+      }}
+      onOpenSettings={() => {
+        setDetailsOpen(false)
+        setSettingsOpen(true)
+      }}
+      onRename={async next => {
+        const renamed = await renameGroupChat(group, next, members)
+
+        if (renamed && renamed !== group) {
+          setDetailsOpen(false)
+          openGroupChat(renamed, 'name')
+        }
+      }}
+      onStop={
+        room.running
+          ? () => {
+              void stopRoomRun()
+              setDetailsOpen(false)
+            }
+          : undefined
+      }
+    />
+  ) : null
 
   const activityPanel = (
     <div className="border-b border-(--ui-stroke-secondary)">
@@ -1395,10 +1434,7 @@ function LegacyGroupChatWorkspace({ group, members, onBack, visible = true }: Gr
 
     return (
       <div
-        className={cn(
-          'group flex items-start gap-2',
-          isUser ? 'rounded-md bg-(--chrome-action-hover) px-2 py-1.5' : 'px-2 py-1'
-        )}
+        className={cn('group flex w-full items-start gap-2 px-2 py-1.5', isUser ? 'justify-end' : 'justify-start')}
         key={entryKey}
       >
         {appearance ? (
@@ -1412,8 +1448,8 @@ function LegacyGroupChatWorkspace({ group, members, onBack, visible = true }: Gr
             />
           </div>
         ) : null}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+        <div className={cn('flex min-w-0 max-w-[min(92%,32rem)] flex-col gap-1', isUser && 'items-end')}>
+          <div className={cn('flex items-center gap-2', isUser && 'flex-row-reverse')}>
             {isUser ? (
               <span className="text-[0.7rem] font-semibold text-foreground">{label}</span>
             ) : (
@@ -1451,10 +1487,16 @@ function LegacyGroupChatWorkspace({ group, members, onBack, visible = true }: Gr
             ) : null}
           </div>
           <div
-            className="min-w-0 text-xs text-(--ui-text-secondary) [&_p]:mb-1 [&_p:last-child]:mb-0 [&_ul]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:mb-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_pre]:whitespace-pre-wrap [&_pre]:wrap-anywhere" // The app shell sets user-select: none globally; message bodies opt
+            className={cn(
+              'min-w-0 [&_p]:mb-1 [&_p:last-child]:mb-0 [&_ul]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:mb-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_pre]:whitespace-pre-wrap [&_pre]:wrap-anywhere',
+              isUser
+                ? 'bot-mode-user-bubble composer-human-message rounded-[1.25rem] px-3.5 py-2 text-[length:var(--conversation-text-font-size,0.875rem)] text-[color:var(--background)]'
+                : 'bot-mode-assistant-bubble rounded-[1.125rem] px-3.5 py-2 text-[length:var(--conversation-text-font-size,0.875rem)]'
+            )}
+            // The app shell sets user-select: none globally; message bodies opt
             // back in so drag-select and ⌘C work in group chat logs.
             data-selectable-text="true"
-            data-slot="group-chat-message-content"
+            data-slot={isUser ? 'group-chat-message-content' : 'bot-assistant-bubble'}
           >
             {MessageTextContent ? (
               <MessageTextContent decorateText={mentionText} media={!member?.remoteSource} text={entry.text} />
@@ -1591,6 +1633,7 @@ function LegacyGroupChatWorkspace({ group, members, onBack, visible = true }: Gr
         </div>
       ) : null}
       {header}
+      {detailsPanel}
       <GroupHoldStatus
         holds={room.holds}
         memberLabel={member => displayName(member, botRosterMeta(member, allMeta))}

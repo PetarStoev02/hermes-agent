@@ -616,8 +616,7 @@ export function GroupRow({ active, group, members, needsYou, onOpen, onDisband, 
       <ContextMenuContent>
         <ContextMenuItem onSelect={() => onOpen(group)}>Open Group Chat</ContextMenuItem>
         <ContextMenuSeparator />
-        {/* Same affordance as a bot row's pin; pinned rooms lead the roster
-            band, and the flag lives on the room record. */}
+        {/* Pin floats the room within the folder list (not the agent pin strip). */}
         <ContextMenuItem
           onSelect={() => {
             const pinned = toggleGroupChatPinned(group)

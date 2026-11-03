@@ -51,7 +51,7 @@ import {
   useGroupCapability
 } from './canonical-group-capabilities'
 import type { GroupCapabilityState } from './canonical-group-capabilities'
-import { registerCanonicalGroup } from './canonical-group-registry'
+import { mirrorCanonicalRoom } from './canonical-group-registry'
 import type { CanonicalGroupOrigin } from './canonical-group-registry'
 import { canonicalGroupRequest, createCanonicalGroup } from './canonical-groups'
 import type { CanonicalGroupRoute } from './canonical-groups'
@@ -1351,7 +1351,9 @@ export function CreateGroupChatDialog({ open, roster, onClose, onCreated }: Crea
 
       // Creation already succeeded; leave it on its owner without adopting a stale result.
       if (!sourceCurrent()) {return}
-      const key = registerCanonicalGroup(route, created.room)
+      // Seat the new room as a folder GroupRow (cluster + Move to…), then open
+      // it under its canonical key so the workspace binds to the gateway room.
+      const key = mirrorCanonicalRoom(route, created.room)
       onClose()
       onCreated?.(key, 'key')
 

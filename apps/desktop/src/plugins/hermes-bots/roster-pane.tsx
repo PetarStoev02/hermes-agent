@@ -15,7 +15,7 @@ import {
   parseRosterKey,
   saveSelectedRosterBot
 } from './bot-state'
-import { CanonicalGroupList } from './canonical-group-registry'
+import { CanonicalGroupRosterSync } from './canonical-group-registry'
 /**
  * The Bots pane itself: the roster's selection reconciliation, the
  * workspace-ownership reads its lifecycle keys off, and the pane that lists
@@ -48,7 +48,7 @@ import { renderRosterDialogs } from './roster-pane-dialogs'
 import { RosterGroupRowView } from './roster-pane-groups'
 import { $lastSources, usePublishRosterSnapshot } from './roster-pane-lifecycle'
 import { rosterSectionRenderers } from './roster-pane-sections'
-import { renderRosterToolbar } from './roster-pane-toolbar'
+import { RosterPaneToolbar } from './roster-pane-toolbar'
 import { botNeedsHandleLabel, rosterGatewayOptions } from './roster-sections'
 import { botWorkspaceOwnerKey, setBotsWorkspaceOwner } from './routing'
 import { activeBots, useTurnBusy } from './row-helpers'
@@ -462,6 +462,7 @@ export function BotsPane() {
       allMeta,
       groupRooms,
       dragging,
+      hasRosterConstraint,
       rosterSectionCollapsed,
       toggleRosterSection,
       setSectionDialog,
@@ -472,29 +473,29 @@ export function BotsPane() {
 
   return (
     <div className="flex h-full flex-col">
-      <CanonicalGroupList onOpen={openGroupChat} />
-      {renderRosterToolbar({
-        b,
-        activityToasts,
-        activeSourceRoster,
-        roster,
-        setCreateOpen,
-        setGroupCreateOpen,
-        setSectionDialog,
-        showRosterTools,
-        showRosterSearch,
-        showRosterFilters,
-        query,
-        setQuery,
-        activeFilterCount,
-        gatewayOptions,
-        rowKindFilter,
-        setRowKindFilter,
-        activityFilter,
-        setActivityFilter,
-        gatewayFilter,
-        setGatewayFilter
-      })}
+      <CanonicalGroupRosterSync />
+      <RosterPaneToolbar
+        activeFilterCount={activeFilterCount}
+        activeSourceRoster={activeSourceRoster}
+        activityFilter={activityFilter}
+        activityToasts={activityToasts}
+        b={b}
+        gatewayFilter={gatewayFilter}
+        gatewayOptions={gatewayOptions}
+        query={query}
+        roster={roster}
+        rowKindFilter={rowKindFilter}
+        setActivityFilter={setActivityFilter}
+        setCreateOpen={setCreateOpen}
+        setGatewayFilter={setGatewayFilter}
+        setGroupCreateOpen={setGroupCreateOpen}
+        setQuery={setQuery}
+        setRowKindFilter={setRowKindFilter}
+        setSectionDialog={setSectionDialog}
+        showRosterFilters={showRosterFilters}
+        showRosterSearch={showRosterSearch}
+        showRosterTools={showRosterTools}
+      />
       {renderRosterContent({
         b,
         staleNotice,

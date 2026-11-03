@@ -21,10 +21,16 @@ export interface PinnedGridLayout {
   avatarSize: number
   /** Columns in the CSS grid. */
   columns: number
+  /** Hug the avatar instead of filling 1/columns — short pin rows stay centered. */
+  hug?: boolean
 }
 
-/** ≤3 pins: large tiles, 3 across. ≥4: smaller tiles, 4 across, wrapping. */
+/** ≤2 pins: large hugged tiles, centered. 3: fill 3 across. ≥4: 4 across. */
 export function pinnedGridLayout(count: number): PinnedGridLayout {
+  if (count <= 2) {
+    return { avatarSize: 56, columns: Math.max(count, 1), hug: true }
+  }
+
   if (count <= 3) {
     return { avatarSize: 48, columns: 3 }
   }

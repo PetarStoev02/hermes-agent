@@ -9,9 +9,13 @@ vi.mock('@hermes/plugin-sdk', async () => {
   const { en } = await import('@/i18n/en')
   const { Textarea } = await import('@/components/ui/textarea')
 
+  const { cn } = await import('@/lib/utils')
+  const { useStore } = await import('@nanostores/react')
+
   return { Textarea, atom: (await import('nanostores')).atom, host: { requestProfile: request }, randomUuid: (await import('@hermes/shared')).randomUuid,
-    useI18n: () => ({ locale: 'en', t: en }),
+    useI18n: () => ({ locale: 'en', t: en }), cn, useValue: useStore,
     Button: (props: ComponentProps<'button'>) => <button {...props} />,
+    RowButton: (props: ComponentProps<'button'>) => <button type="button" {...props} />,
     MessageTextContent: ({ text }: { text: string }) => <div data-testid="markdown">{text}</div>,
     Streamdown: ({ children }: { children: ReactNode }) => <div data-testid="markdown">{children}</div>,
     Codicon: () => <span />, Tip: ({ children }: { children: ReactNode }) => <>{children}</> }
@@ -25,8 +29,16 @@ vi.mock('./canonical-group-labels', async () => {
   const { CANONICAL_GROUP_LOCALES } = await import('./canonical-group-locales')
 
   return { useCanonicalGroupLabels: () => ({ ...CANONICAL_GROUP_LOCALES.en, back: 'Back', refresh: 'Refresh', retry: 'Retry',
-    send: 'Send', stop: 'Stop', download: 'Download', discard: 'Discard', cancel: 'Cancel' }) }
+    send: 'Send', stop: 'Stop', download: 'Download', discard: 'Discard', cancel: 'Cancel', you: 'You' }) }
 })
+vi.mock('./avatar', () => ({
+  avatarColor: () => '#000',
+  botAppearance: () => ({ shape: 'hex', color: '#000', image: null }),
+  BotFace: () => <span data-testid="bot-face" />
+}))
+vi.mock('./group-avatar-cluster', () => ({
+  GroupAvatarCluster: () => <span data-testid="group-avatar" />
+}))
 
 import { CanonicalGroupWorkspace } from './canonical-group-workspace'
 
@@ -131,7 +143,27 @@ it('renders only room messages with their author and markdown presentation', asy
   const history = within(screen.getByRole('log'))
 
   await waitFor(() => expect(history.getByText(/helper/)).toBeTruthy())
-  expect(screen.getByRole('list', { name: 'Members' }).textContent).toContain('helper')
   expect(history.getByTestId('markdown').textContent).toBe('**Done**')
+  expect(history.getByTestId('bot-face')).toBeTruthy()
   expect(history.queryByText('turn.settled')).toBeNull()
+})
+
+it('surfaces a silent round so a (pass)-only discussion is not invisible', async () => {
+  request.mockImplementation(async (_route, method) => {
+    if (method === 'groups.state') {return { room: { name: 'Room' }, driver_status: {} }}
+
+    if (method === 'groups.log') {
+      return { events: [
+        { seq: 1, room_id: binding.roomId, kind: 'message.user', actor: { kind: 'user', id: 'desktop' }, payload: { text: 'hey' } },
+        { seq: 2, room_id: binding.roomId, kind: 'room.activity', payload: { status: 'settled', reason_code: 'silent_round' } }
+      ] }
+    }
+
+    throw new Error(`Unexpected method ${method}`)
+  })
+  render(<CanonicalGroupWorkspace binding={binding} />)
+  const history = within(screen.getByRole('log'))
+  await waitFor(() => expect(history.getByText('You')).toBeTruthy())
+  expect(history.getByText(/No one replied — ask something concrete/)).toBeTruthy()
+  expect(history.queryByText(/silent_round/)).toBeNull()
 })

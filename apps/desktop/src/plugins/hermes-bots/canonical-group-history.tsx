@@ -1,12 +1,17 @@
 import * as sdk from '@hermes/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 
+import { avatarColor, botAppearance, BotFace } from './avatar'
 import { type CanonicalGroupAttachment, CanonicalGroupAttachments, fetchCanonicalGroupAttachment } from './canonical-group-attachments'
 import { useCanonicalGroupLabels } from './canonical-group-labels'
 import type { CanonicalGroupBinding, CanonicalRoomMember } from './canonical-groups'
 
 const MessageTextContent = typeof sdk === 'undefined' ? undefined : sdk.MessageTextContent
 const Streamdown = typeof sdk === 'undefined' ? undefined : sdk.Streamdown
+
+function cn(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(' ')
+}
 
 export interface CanonicalGroupEvent {
   seq: number
@@ -37,6 +42,12 @@ function eventAuthor(event: CanonicalGroupEvent, roster: Map<string, CanonicalRo
     (isMessage ? event.actor?.id : memberId)
 }
 
+function eventMember(event: CanonicalGroupEvent, roster: Map<string, CanonicalRoomMember>): CanonicalRoomMember | undefined {
+  const memberId = event.actor?.kind === 'member' ? event.actor.id : event.payload.member_id
+
+  return roster.get(memberId ?? '')
+}
+
 function EventTime({ timestamp }: { timestamp?: number }) {
   if (typeof timestamp !== 'number') {return null}
   const at = new Date(timestamp * 1000)
@@ -48,16 +59,18 @@ function EventTime({ timestamp }: { timestamp?: number }) {
 
 function EventBody({ event, notice }: { event: CanonicalGroupEvent; notice?: string }) {
   if (notice) {
-    const detail = event.payload.error || event.payload.reason || event.payload.reason_code
+    // Failures carry a human error/reason. Activity codes like silent_round are
+    // already mapped into `notice` — never append the raw code after it.
+    const detail = event.payload.error || event.payload.reason
 
     return <p className="text-xs text-(--ui-text-secondary)" data-selectable-text="true">
-      <strong>{notice}</strong>{detail && <>: {detail}</>}
+      <strong>{notice}</strong>{detail && detail !== notice && !notice.includes(detail) ? <>: {detail}</> : null}
     </p>
   }
 
   const text = event.payload.text || event.payload.content || ''
 
-  return <div className="min-w-0 text-xs text-(--ui-text-secondary) [&_p]:mb-1 [&_p:last-child]:mb-0 [&_ul]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:mb-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_pre]:whitespace-pre-wrap [&_pre]:wrap-anywhere" data-selectable-text="true">
+  return <div className="min-w-0 text-[length:var(--conversation-text-font-size,0.875rem)] leading-(--dt-line-height,1.45) [&_p]:mb-1 [&_p:last-child]:mb-0 [&_ul]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:mb-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_pre]:whitespace-pre-wrap [&_pre]:wrap-anywhere" data-selectable-text="true">
     {/* The shared renderer (layout and large-message safeguards). media={false}: room text
         may come from another machine, so its MEDIA: paths never resolve against this gateway;
         room files keep their own download path below. */}
@@ -168,25 +181,69 @@ export function CanonicalGroupHistory({ binding, events, members = [], disabled 
   ])
 
   return <>{events.map(event => {
-    const notice = event.kind === 'room.activity' && event.payload.status === 'bounded'
-      ? labels.workLimitReached : notices.get(event.kind)
+    // Bounded (max_rounds / max_messages) is a quiet driver stop — a new user
+    // send starts a fresh discussion. Do not paint a "work limit" banner for it.
+    if (event.kind === 'room.activity' && event.payload.status === 'bounded') {return null}
+
+    const silentRound = event.kind === 'room.activity' && event.payload.status === 'settled' &&
+      event.payload.reason_code === 'silent_round'
+
+    const notice = silentRound ? labels.silentRound : notices.get(event.kind)
 
     const isMessage = event.kind === 'message' || event.kind === 'message.user' || event.kind === 'message.member'
 
     if (!notice && !isMessage) {return null}
-    const author = eventAuthor(event, roster, isMessage)
+    const isUser = isMessage && (event.kind === 'message.user' || event.actor?.kind === 'user')
+    const author = isUser ? labels.you : eventAuthor(event, roster, isMessage)
+    const member = !isUser && isMessage ? eventMember(event, roster) : undefined
+    const faceName = member?.profile || member?.handle || author || 'agent'
+    const appearance = !isUser && isMessage ? botAppearance(faceName, null) : null
     const previewEventId = event.room_id === binding.roomId ? event.event_id : undefined
 
-    return <div className="grid grid-cols-[minmax(0,1fr)] gap-1 px-2 py-1.5" key={event.seq}>
-    <div className="flex items-center gap-2">
-      {author && <strong className="text-[0.7rem] font-semibold text-(--ui-accent)">{author}</strong>}
-      <EventTime timestamp={event.created_at} />
+    if (notice) {
+      return <div className="flex justify-center px-3 py-2" key={event.seq}>
+        <div className="max-w-[min(100%,28rem)] rounded-full bg-(--ui-bg-tertiary) px-3 py-1 text-center text-[0.7rem] text-(--ui-text-secondary)">
+          <EventBody event={event} notice={notice} />
+        </div>
+      </div>
+    }
+
+    return <div
+      className={cn('flex w-full gap-2 px-2 py-1.5', isUser ? 'justify-end' : 'justify-start')}
+      key={event.seq}
+    >
+      {appearance ? (
+        <div className="mt-0.5 shrink-0">
+          <BotFace
+            color={avatarColor(appearance.color, faceName)}
+            image={null}
+            name={faceName}
+            shape={appearance.shape}
+            size={24}
+          />
+        </div>
+      ) : null}
+      <div className={cn('flex min-w-0 max-w-[min(92%,32rem)] flex-col gap-1', isUser && 'items-end')}>
+        <div className={cn('flex items-center gap-2', isUser && 'flex-row-reverse')}>
+          {author && <strong className={cn('text-[0.7rem] font-semibold', isUser ? 'text-foreground' : 'text-(--ui-accent)')}>{author}</strong>}
+          <EventTime timestamp={event.created_at} />
+        </div>
+        <div
+          className={cn(
+            isUser
+              ? 'bot-mode-user-bubble composer-human-message rounded-[1.25rem] px-3.5 py-2 text-[color:var(--background)]'
+              : 'bot-mode-assistant-bubble rounded-[1.125rem] px-3.5 py-2'
+          )}
+          data-slot={isUser ? undefined : 'bot-assistant-bubble'}
+        >
+          <EventBody event={event} />
+          {previewEventId && event.payload.attachments?.filter(a => a.kind === 'image').map(a =>
+            <ImagePreview attachment={a} binding={binding} disabled={disabled} eventId={previewEventId} key={a.attachment_id ?? a.name} />)}
+          {!!event.payload.attachments?.length && <CanonicalGroupAttachments
+            attachments={event.payload.attachments.map(attachment => ({ ...attachment, event_id: event.event_id }))}
+            binding={binding} disabled={disabled || !event.event_id || event.room_id !== binding.roomId} readOnly />}
+        </div>
+      </div>
     </div>
-    <EventBody event={event} notice={notice} />
-    {previewEventId && event.payload.attachments?.filter(a => a.kind === 'image').map(a =>
-      <ImagePreview attachment={a} binding={binding} disabled={disabled} eventId={previewEventId} key={a.attachment_id ?? a.name} />)}
-    {!!event.payload.attachments?.length && <CanonicalGroupAttachments
-      attachments={event.payload.attachments.map(attachment => ({ ...attachment, event_id: event.event_id }))}
-      binding={binding} disabled={disabled || !event.event_id || event.room_id !== binding.roomId} readOnly />}
-  </div>})}</>
+  })}</>
 }

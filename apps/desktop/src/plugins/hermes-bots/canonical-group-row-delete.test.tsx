@@ -32,7 +32,7 @@ vi.mock('@hermes/plugin-sdk', async importOriginal => {
 })
 
 import { $canonicalGroupBindings, CanonicalGroupList, publishCanonicalGroup } from './canonical-group-registry'
-import { $groupChatWorkspace } from './group-chat'
+import { $groupChats, $groupChatWorkspace } from './group-chat'
 import { dropGroupMainTab, recordGroupMainTab } from './group-panes'
 
 const room = { room_id: 'room-1', name: 'Launch crew', members: [{ member_id: 'm1', profile: 'work', handle: 'work' }] }
@@ -69,6 +69,7 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   $canonicalGroupBindings.set({})
+  $groupChats.set({})
   $groupChatWorkspace.set(null)
   dropGroupMainTab('Launch crew')
   dropGroupMainTab('Other crew')

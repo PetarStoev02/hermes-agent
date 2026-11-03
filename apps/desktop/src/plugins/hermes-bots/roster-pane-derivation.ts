@@ -107,7 +107,9 @@ export function deriveRosterRows({
     .filter(row => rowKindFilter !== 'bots' && rosterActivityMatches(row, activityFilter))
 
   // Pinned bots leave their folders for the tile grid above; they keep
-  // section membership in meta so unpinning restores their place.
+  // section membership in meta so unpinning restores their place. Group
+  // chats stay in folders / Unassigned as peer rows (member cluster avatars)
+  // — pin only floats them within that list, it does not lift them to the strip.
   const reachableFiltered = preferReachableSameNameRows(filteredRoster)
   const pinnedBots = rowKindFilter === 'groups' ? [] : pinnedBotsFromRoster(reachableFiltered, allMeta, activityOf)
   const folderBots = reachableFiltered.filter(bot => !isPinned(bot))

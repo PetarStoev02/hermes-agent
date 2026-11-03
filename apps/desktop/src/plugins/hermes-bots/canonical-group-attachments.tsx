@@ -1,4 +1,4 @@
-import { Button, randomUuid } from '@hermes/plugin-sdk'
+import { Button, Codicon, randomUuid } from '@hermes/plugin-sdk'
 import { type Ref, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 
 import { downloadCanonicalAttachment } from './canonical-attachment-download'
@@ -109,10 +109,21 @@ export function CanonicalGroupAttachments({ binding, attachments, onChange, onUp
     {!readOnly && <><input hidden onChange={e => { const file = e.target.files?.[0];
 
  if (file) {void upload([file]);} e.currentTarget.value = '' }} ref={input} type="file" />
-    <Button disabled={disabled || busy} onClick={() => input.current?.click()} type="button">{labels.attachFiles}</Button></>}
+    <Button
+      aria-label={labels.attachFiles}
+      className="shrink-0 text-(--ui-text-tertiary) hover:text-foreground"
+      disabled={disabled || busy}
+      onClick={() => input.current?.click()}
+      size="icon"
+      type="button"
+      variant="ghost"
+    >
+      <Codicon name="attach" />
+    </Button></>}
     {attachments.map(a => <span className="flex items-center gap-1" key={a.attachment_id ?? a.name}>
-      <span>{a.name}</span><Button disabled={disabled || busy} onClick={() => void download(a)} type="button">{labels.download}</Button>
-      {!readOnly && <Button disabled={disabled || busy} onClick={() => onChange?.(attachments.filter(item => item !== a))} type="button">{labels.removeAttachment}</Button>}
+      <span className="max-w-32 truncate text-[0.7rem] text-(--ui-text-tertiary)">{a.name}</span>
+      <Button disabled={disabled || busy} onClick={() => void download(a)} size="sm" type="button" variant="ghost">{labels.download}</Button>
+      {!readOnly && <Button aria-label={labels.removeAttachment} disabled={disabled || busy} onClick={() => onChange?.(attachments.filter(item => item !== a))} size="icon" type="button" variant="ghost"><Codicon name="close" /></Button>}
     </span>)}
     {error && <span role="alert">{labels.uploadFailed}: {error}</span>}
   </div>

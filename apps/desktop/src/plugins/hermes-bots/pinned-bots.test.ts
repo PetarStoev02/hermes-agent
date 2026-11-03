@@ -53,9 +53,10 @@ beforeEach(() => {
 })
 
 describe('pinnedGridLayout', () => {
-  it('uses large tiles in 3 columns up to 3 pins, then shrinks to 4 columns', () => {
-    expect(pinnedGridLayout(0)).toEqual({ avatarSize: 48, columns: 3 })
-    expect(pinnedGridLayout(1)).toEqual({ avatarSize: 48, columns: 3 })
+  it('hugs large circles for 1–2 pins, fills 3 across at 3, then shrinks to 4', () => {
+    expect(pinnedGridLayout(0)).toEqual({ avatarSize: 56, columns: 1, hug: true })
+    expect(pinnedGridLayout(1)).toEqual({ avatarSize: 56, columns: 1, hug: true })
+    expect(pinnedGridLayout(2)).toEqual({ avatarSize: 56, columns: 2, hug: true })
     expect(pinnedGridLayout(3)).toEqual({ avatarSize: 48, columns: 3 })
     expect(pinnedGridLayout(4)).toEqual({ avatarSize: 36, columns: 4 })
     expect(pinnedGridLayout(7)).toEqual({ avatarSize: 36, columns: 4 })

@@ -1,11 +1,15 @@
-import { Button, ConfirmDialog, Input } from '@hermes/plugin-sdk'
+import { cn, Codicon, ConfirmDialog, RowButton } from '@hermes/plugin-sdk'
 import { useState } from 'react'
 
 import { CanonicalGroupRoster, type CanonicalMemberPhase } from './canonical-group-activity'
 import { useCanonicalGroupLabels } from './canonical-group-labels'
-import type { CanonicalRoom } from './canonical-groups'
+import { groupMembersFromCanonicalRoom } from './canonical-group-mirror'
+import type { CanonicalGroupBinding, CanonicalRoom } from './canonical-groups'
+import { GroupAvatarCluster } from './group-avatar-cluster'
+import { GroupDetailsPanel } from './group-details-panel'
 
 interface CanonicalGroupHeaderProps {
+  binding: CanonicalGroupBinding
   busy: boolean
   canStop: boolean
   onBack?: () => void
@@ -16,35 +20,105 @@ interface CanonicalGroupHeaderProps {
   room?: CanonicalRoom
 }
 
-export function CanonicalGroupHeader({ busy, canStop, onBack, onDisband, onRename, onStop, phases, room }: CanonicalGroupHeaderProps) {
+/** Same floating name island as BotNamePill. Stop / Rename / Disband live in
+ *  the details panel (Details + Members), not in the chat chrome. */
+export function CanonicalGroupHeader({
+  binding,
+  busy,
+  canStop,
+  onDisband,
+  onRename,
+  onStop,
+  phases,
+  room
+}: CanonicalGroupHeaderProps) {
   const labels = useCanonicalGroupLabels()
-  const [renaming, setRenaming] = useState<string | null>(null)
   const [ending, setEnding] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
 
-  const rename = (name: string) => {
-    setRenaming(null)
+  const members = room && binding?.connectionId
+    ? groupMembersFromCanonicalRoom({ connectionId: binding.connectionId, profile: binding.profile }, room)
+    : []
 
-    if (name) {onRename(name)}
-  }
+  const name = room?.name || labels.loadingGroup
+  // Only paint the roster while someone is queued/working — idle it reads as a
+  // second title under the island and makes the room look like a stuck 1:1.
+  const showActivity = [...phases.values()].some(phase => phase === 'working' || phase === 'queued')
 
-  return <>
-    <header className="flex items-center gap-2">
-      {onBack && <Button onClick={onBack}>{labels.back}</Button>}
-      <div className="min-w-0">
-        <h2 className="text-sm font-medium">{room?.name || labels.loadingGroup}</h2>
-        <CanonicalGroupRoster label={labels.members} labels={labels} members={room?.members} phases={phases} />
+  return (
+    <>
+      <div
+        className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-3"
+        data-slot="group-name-pill"
+      >
+        <RowButton
+          aria-expanded={detailsOpen}
+          aria-label={name}
+          className={cn(
+            'pointer-events-auto flex max-w-[min(100%,18rem)] items-center gap-2 rounded-full border border-(--stroke-nous)',
+            'bg-(--ui-widget-surface-background) px-2.5 py-1 shadow-nous',
+            'text-[0.8125rem] font-medium text-(--ui-text-primary)',
+            'transition-colors hover:bg-(--chrome-action-hover) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-accent)'
+          )}
+          disabled={!room}
+          onClick={() => setDetailsOpen(open => !open)}
+          title={name}
+        >
+          <GroupAvatarCluster members={members} size={22} />
+          <span className="min-w-0 truncate">{name}</span>
+          <Codicon className="shrink-0 text-[0.625rem] text-(--ui-text-quaternary)" name="chevron-right" />
+        </RowButton>
       </div>
-      <Button disabled={busy || !canStop} onClick={onStop}>{labels.stop}</Button>
-      <Button disabled={busy || !room} onClick={() => setRenaming(room?.name ?? '')}>{labels.rename}</Button>
-      <Button disabled={busy || !room} onClick={() => setEnding(true)}>{labels.disband}</Button>
-    </header>
-    {renaming !== null && <form className="flex items-center gap-2" onSubmit={event => { event.preventDefault(); rename(renaming.trim()) }}>
-      <Input aria-label={labels.renameLabel} autoFocus onChange={event => setRenaming(event.target.value)} value={renaming} />
-      <Button disabled={busy || !renaming.trim()} type="submit">{labels.save}</Button>
-      <Button onClick={() => setRenaming(null)} type="button">{labels.cancel}</Button>
-    </form>}
-    {ending && <ConfirmDialog busyLabel={labels.disbanding} confirmLabel={labels.disband}
-      description={<span>{labels.disbandDescPrefix}<span className="font-medium text-foreground">{room?.name}</span>{labels.disbandDescSuffix(room?.members?.length ?? 0)}</span>}
-      destructive doneLabel={labels.disbandDone} onClose={() => setEnding(false)} onConfirm={onDisband} open title={labels.disbandTitle} />}
-  </>
+      <div className="flex justify-center px-3 pt-11">
+        {showActivity ? (
+          <CanonicalGroupRoster
+            label={labels.members}
+            labels={labels}
+            members={room?.members}
+            phases={phases}
+          />
+        ) : null}
+      </div>
+      {detailsOpen && room ? (
+        <GroupDetailsPanel
+          busy={busy}
+          canStop={canStop}
+          group={room.name}
+          members={members}
+          onClose={() => setDetailsOpen(false)}
+          onDisband={() => {
+            setDetailsOpen(false)
+            setEnding(true)
+          }}
+          onRename={next => {
+            onRename(next)
+          }}
+          onStop={() => {
+            onStop()
+            setDetailsOpen(false)
+          }}
+          tab="details"
+        />
+      ) : null}
+      {ending && (
+        <ConfirmDialog
+          busyLabel={labels.disbanding}
+          confirmLabel={labels.disband}
+          description={
+            <span>
+              {labels.disbandDescPrefix}
+              <span className="font-medium text-foreground">{room?.name}</span>
+              {labels.disbandDescSuffix(room?.members?.length ?? 0)}
+            </span>
+          }
+          destructive
+          doneLabel={labels.disbandDone}
+          onClose={() => setEnding(false)}
+          onConfirm={onDisband}
+          open
+          title={labels.disbandTitle}
+        />
+      )}
+    </>
+  )
 }

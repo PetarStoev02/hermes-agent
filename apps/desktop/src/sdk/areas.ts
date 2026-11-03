@@ -8,7 +8,13 @@ export const STATUSBAR_AREAS = { left: 'statusBar.left', right: 'statusBar.right
  *  stays mounted across chat ↔ page navigation, so `useEffect` setup/cleanup
  *  runs once per registration, not once per route. Page-owned controls that
  *  should exist only while a page is up go to `WORKSPACE_PAGE_HEADER_AREA`. */
-export const TITLEBAR_AREAS = { center: 'titleBar.center', left: 'titleBar.left', right: 'titleBar.right' } as const
+export const TITLEBAR_AREAS = {
+  center: 'titleBar.center',
+  left: 'titleBar.left',
+  right: 'titleBar.right',
+  /** Trailing tools on the left sidebar's titlebar band (traffic-light row). */
+  sidebarEnd: 'titleBar.sidebarEnd'
+} as const
 /** Per-card labels on Kanban tiles: register a `KANBAN_CARD_AREAS.badges`
  *  data contribution whose `decorate({ id, status, tenant, assignee },
  *  { tenants })` returns `{ label, tone?, tooltip? }` (or a few, or `null`). Core paints

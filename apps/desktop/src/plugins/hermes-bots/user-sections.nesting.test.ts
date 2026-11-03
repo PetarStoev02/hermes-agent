@@ -448,6 +448,25 @@ describe('nested sections — what the roster draws', () => {
     ])
   })
 
+  it('search/filter hides empty folders the same way gateway nesting does', async () => {
+    const { engineering } = studioTree()
+
+    await moveBotsToSection([bot('pm')], engineering.id)
+    expect(
+      names(visibleSectionBlocks(blocksFor(), { collapsed: open, constrained: true, dragging: null, nested: false }))
+    ).toEqual(['Studio', 'Team', 'Engineering'])
+    expect(
+      names(
+        visibleSectionBlocks(blocksFor(), {
+          collapsed: open,
+          constrained: true,
+          dragging: 'legacy::x',
+          nested: false
+        })
+      )
+    ).toEqual(['Studio', 'Team', 'Engineering', 'Clients', 'Personal', 'Unassigned'])
+  })
+
   it('an empty Unassigned is drawn while a folder, bot, or pin is dragged (drop / unpin target)', async () => {
     const { personal } = studioTree()
 

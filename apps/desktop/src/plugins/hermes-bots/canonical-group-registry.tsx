@@ -1,7 +1,8 @@
 import { atom, host, randomUuid, useValue } from '@hermes/plugin-sdk'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useCanonicalGroupLabels } from './canonical-group-labels'
+import { dropCanonicalRosterMirror, groupMembersFromCanonicalRoom, mirrorCanonicalRoomRecord } from './canonical-group-mirror'
 import { CanonicalGroupRow } from './canonical-group-row'
 import { canonicalGroupRequest, captureCanonicalGroupRoute, discoverCanonicalGroups } from './canonical-groups'
 import type { CanonicalGroupBinding, CanonicalGroupRoute, CanonicalRoom } from './canonical-groups'
@@ -108,6 +109,38 @@ export function publishCanonicalGroup(
   $canonicalGroupBindings.set({ ...$canonicalGroupBindings.get(), [alias]: binding })
 }
 
+/** Register + name-alias + local roster mirror so the room files into folders
+ *  as a GroupRow peer. */
+export function mirrorCanonicalRoom(route: CanonicalGroupRoute, room: CanonicalRoom): string {
+  const key = registerCanonicalGroup(route, room)
+  publishCanonicalGroup(route, room.name, { authority: route, room }, 'name')
+  mirrorCanonicalRoomRecord(route, room)
+
+  return key
+}
+
+/** After `groups.rename`: re-key the folder GroupRow, swap the name alias, and
+ *  bump discovery so every surface converges on the new display name. */
+export function remirrorCanonicalRoomRename(
+  route: CanonicalGroupRoute,
+  room: CanonicalRoom,
+  previousName?: string
+): string {
+  const prior = previousName && previousName !== room.name ? previousName : undefined
+  const key = mirrorCanonicalRoom(route, room)
+
+  if (prior) {
+    const oldAlias = canonicalGroupAliasKey(route, prior)
+    const bindings = { ...$canonicalGroupBindings.get() }
+    delete bindings[oldAlias]
+    $canonicalGroupBindings.set(bindings)
+  }
+
+  $canonicalGroupListRevision.set($canonicalGroupListRevision.get() + 1)
+
+  return key
+}
+
 /** Every view string showing this room: its `canonical:` keys, and the name a
  *  name-opened tab and selection are recorded under (from its route-scoped alias). */
 function canonicalGroupViews({ connectionId, profile, roomId }: CanonicalGroupBinding): Set<string> {
@@ -123,7 +156,12 @@ function canonicalGroupViews({ connectionId, profile, roomId }: CanonicalGroupBi
   return views
 }
 
-interface ListedRoom { binding: CanonicalGroupBinding; key: string; memberCount: number; name: string }
+interface ListedRoom {
+  binding: CanonicalGroupBinding
+  key: string
+  members: ReturnType<typeof groupMembersFromCanonicalRoom>
+  name: string
+}
 
 /** Disband on the room's own gateway, then retire it everywhere this window shows it.
  *  A refusal rejects before anything is dropped, so the row stays and the confirm shows why. */
@@ -131,45 +169,101 @@ async function disbandListedRoom(room: ListedRoom, doneMessage: string): Promise
   await canonicalGroupRequest(room.binding, 'groups.disband', { room_id: room.binding.roomId, cancel_id: randomUuid() })
   // Collect before forgetting: the bindings are the only record of which views alias this room.
   canonicalGroupViews(room.binding).add(room.key).forEach(closeGroupChatMainTab)
+  dropCanonicalRosterMirror(room.binding.roomId, room.name)
   forgetCanonicalGroup(room.binding)
   host.notify({ kind: 'success', message: doneMessage })
 }
 
-export function CanonicalGroupList({ onOpen }: { onOpen: (key: string, origin: CanonicalGroupOrigin) => void }) {
-  const labels = useCanonicalGroupLabels()
+/** Discover gateway rooms, seat each as a folder GroupRow via `$groupChats`,
+ *  and prune mirrors for rooms that left the list on this route. */
+function useCanonicalGroupDiscovery(onRooms?: (rooms: ListedRoom[]) => void): void {
   const connectionId = useValue(host.state.connectionId)
   const profile = useValue(host.state.profile)
-  const [rooms, setRooms] = useState<ListedRoom[]>([])
   const revision = useValue($canonicalGroupListRevision)
+  const onRoomsRef = useRef(onRooms)
+  onRoomsRef.current = onRooms
+
   useEffect(() => {
     let cancelled = false
-    setRooms([])
+    onRoomsRef.current?.([])
     void (async () => {
       const route = captureCanonicalGroupRoute()
       const result = await discoverCanonicalGroups(route)
 
-      if (!cancelled) {
-        setRooms(result.rooms.map(room => ({
+      if (cancelled) {return}
+
+      const listed: ListedRoom[] = result.rooms.map(room => {
+        const key = mirrorCanonicalRoom(route, room)
+
+        return {
           binding: { ...route, roomId: room.room_id, roomName: room.name },
-          key: registerCanonicalGroup(route, room),
-          memberCount: room.members?.length ?? 0,
+          key,
+          members: groupMembersFromCanonicalRoom(route, room),
           name: room.name
-        })))
+        }
+      })
+
+      // Rooms that left this gateway's list: drop their local mirrors + bindings
+      // so a disband on another surface doesn't leave a stale GroupRow behind.
+      const listedIds = new Set(listed.map(room => room.binding.roomId))
+      let pruned = false
+
+      for (const binding of Object.values($canonicalGroupBindings.get())) {
+        if (binding.connectionId !== route.connectionId || binding.profile !== route.profile) {
+          continue
+        }
+
+        if (listedIds.has(binding.roomId) || !binding.roomName) {
+          continue
+        }
+
+        pruned = true
+        dropCanonicalRosterMirror(binding.roomId, binding.roomName)
       }
+
+      if (pruned) {
+        // Drop every key/alias for rooms no longer listed on this route —
+        // without bumping the revision (we are already the discoverer).
+        $canonicalGroupBindings.set(Object.fromEntries(
+          Object.entries($canonicalGroupBindings.get()).filter(([, binding]) =>
+            binding.connectionId !== route.connectionId
+            || binding.profile !== route.profile
+            || listedIds.has(binding.roomId)
+          )
+        ))
+      }
+
+      onRoomsRef.current?.(listed)
     })().catch(() => {
       // Quiet: gateway health already lives in the statusbar. Do not paint a
       // "Refresh gateway groups" / error strip above the roster.
-      if (!cancelled) {setRooms([])}
+      if (!cancelled) {onRoomsRef.current?.([])}
     })
 
     return () => { cancelled = true }
   }, [connectionId, profile, revision])
+}
+
+/** Headless: seats gateway rooms into the folder roster. Mount once in the pane. */
+export function CanonicalGroupRosterSync() {
+  useCanonicalGroupDiscovery()
+
+  return null
+}
+
+/** Standalone list (tests / rare surfaces): Grok-style rows that also mirror
+ *  into `$groupChats`. The Bots pane uses `CanonicalGroupRosterSync` instead
+ *  so rooms appear once — as folder peers, not a strip above Unassigned. */
+export function CanonicalGroupList({ onOpen }: { onOpen: (key: string, origin: CanonicalGroupOrigin) => void }) {
+  const labels = useCanonicalGroupLabels()
+  const [rooms, setRooms] = useState<ListedRoom[]>([])
+  useCanonicalGroupDiscovery(setRooms)
 
   // Rooms only — no always-on refresh chrome when empty or offline.
   if (rooms.length === 0) {return null}
 
   return <div className="grid gap-1 px-2 pb-1" data-slot="canonical-group-list">
-    {rooms.map(room => <CanonicalGroupRow key={room.key} memberCount={room.memberCount} name={room.name}
+    {rooms.map(room => <CanonicalGroupRow key={room.key} members={room.members} name={room.name}
       onDelete={() => disbandListedRoom(room, labels.disbanded(room.name))} onOpen={() => onOpen(room.key, 'key')} />)}
   </div>
 }

@@ -2011,6 +2011,13 @@ body.guest-pointer-lock :is(webview, iframe) {
   box-shadow: none;
 }
 
+/* Group history (and any markdown body) stamps its own text color; force the
+   light ink through so dark pills never render black-on-charcoal. */
+[data-chat-surface][data-workspace-mode='bots'] .composer-human-message.bot-mode-user-bubble :where(*),
+.composer-human-message.bot-mode-user-bubble :where(*) {
+  color: inherit !important;
+}
+
 [data-chat-surface][data-workspace-mode='bots'] .composer-human-message.bot-mode-user-bubble:hover,
 .composer-human-message.bot-mode-user-bubble:hover {
   border-color: transparent !important;
@@ -2018,7 +2025,7 @@ body.guest-pointer-lock :is(webview, iframe) {
 
 [data-chat-surface][data-workspace-mode='bots'] .composer-human-message.bot-mode-user-bubble :is(a, code, pre),
 .composer-human-message.bot-mode-user-bubble :is(a, code, pre) {
-  color: inherit;
+  color: inherit !important;
 }
 
 [data-chat-surface][data-workspace-mode='bots'] .composer-human-message.bot-mode-user-bubble code,

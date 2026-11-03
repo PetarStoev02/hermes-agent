@@ -29,6 +29,9 @@ export interface CanonicalGroupMessages {
   memberWorking: string
   memberQueued: string
   groupWorking: string
+  /** Everyone took a turn but replied with (pass) — nothing visible was posted. */
+  silentRound: string
+  composerPlaceholder: string
 }
 
 export const CANONICAL_GROUP_LOCALES = {
@@ -62,7 +65,9 @@ export const CANONICAL_GROUP_LOCALES = {
     uploadFailed: 'Upload failed',
     memberWorking: 'Working',
     memberQueued: 'Queued',
-    groupWorking: 'The group is working…'
+    groupWorking: 'The group is working…',
+    silentRound: 'No one replied — ask something concrete, or @mention a member.',
+    composerPlaceholder: 'Message the group…'
   },
   ja: {
     roomStopped: 'グループが停止しました',
@@ -94,7 +99,9 @@ export const CANONICAL_GROUP_LOCALES = {
     uploadFailed: 'アップロードに失敗しました',
     memberWorking: '作業中',
     memberQueued: '待機中',
-    groupWorking: 'グループが作業中です…'
+    groupWorking: 'グループが作業中です…',
+    silentRound: '誰も返信しませんでした — 回答が必要なときは @メンションしてください。',
+    composerPlaceholder: 'グループにメッセージ…'
   },
   zh: {
     roomStopped: '群组已停止',
@@ -126,7 +133,9 @@ export const CANONICAL_GROUP_LOCALES = {
     uploadFailed: '上传失败',
     memberWorking: '工作中',
     memberQueued: '排队中',
-    groupWorking: '群组正在处理…'
+    groupWorking: '群组正在处理…',
+    silentRound: '没有人回复 — 需要回答时请 @提及某人。',
+    composerPlaceholder: '给群组发消息…'
   },
   'zh-hant': {
     roomStopped: '群組已停止',
@@ -158,7 +167,9 @@ export const CANONICAL_GROUP_LOCALES = {
     uploadFailed: '上傳失敗',
     memberWorking: '工作中',
     memberQueued: '排隊中',
-    groupWorking: '群組正在處理…'
+    groupWorking: '群組正在處理…',
+    silentRound: '沒有人回覆 — 需要回答時請 @提及某人。',
+    composerPlaceholder: '傳送群組訊息…'
   },
   ar: {
     roomStopped: 'أُوقفت المجموعة',
@@ -190,7 +201,9 @@ export const CANONICAL_GROUP_LOCALES = {
     uploadFailed: 'فشل الرفع',
     memberWorking: 'يعمل',
     memberQueued: 'في الانتظار',
-    groupWorking: 'المجموعة تعمل…'
+    groupWorking: 'المجموعة تعمل…',
+    silentRound: 'لم يرد أحد — استخدم @mention عندما تحتاج إجابة.',
+    composerPlaceholder: 'راسل المجموعة…'
   },
   ru: {
     roomStopped: 'Группа остановлена',
@@ -225,7 +238,9 @@ export const CANONICAL_GROUP_LOCALES = {
     uploadFailed: 'Не удалось загрузить файл',
     memberWorking: 'Работает',
     memberQueued: 'В очереди',
-    groupWorking: 'Группа работает…'
+    groupWorking: 'Группа работает…',
+    silentRound: 'Никто не ответил — упомяните участника через @, когда нужен ответ.',
+    composerPlaceholder: 'Сообщение группе…'
   },
   fr: {
     roomStopped: 'Groupe arrêté',
@@ -259,7 +274,9 @@ export const CANONICAL_GROUP_LOCALES = {
     uploadFailed: 'Échec du téléversement',
     memberWorking: 'En cours',
     memberQueued: 'En attente',
-    groupWorking: 'Le groupe travaille…'
+    groupWorking: 'Le groupe travaille…',
+    silentRound: 'Personne n’a répondu — mentionnez quelqu’un avec @ si vous attendez une réponse.',
+    composerPlaceholder: 'Message au groupe…'
   },
   de: {
     roomStopped: 'Gruppe angehalten',
@@ -294,7 +311,9 @@ export const CANONICAL_GROUP_LOCALES = {
     uploadFailed: 'Hochladen fehlgeschlagen',
     memberWorking: 'Arbeitet',
     memberQueued: 'In der Warteschlange',
-    groupWorking: 'Die Gruppe arbeitet…'
+    groupWorking: 'Die Gruppe arbeitet…',
+    silentRound: 'Niemand hat geantwortet — @erwähne jemanden, wenn du eine Antwort brauchst.',
+    composerPlaceholder: 'Nachricht an die Gruppe…'
   },
   es: {
     roomStopped: 'Grupo detenido',
@@ -328,6 +347,8 @@ export const CANONICAL_GROUP_LOCALES = {
     uploadFailed: 'Error al subir',
     memberWorking: 'Trabajando',
     memberQueued: 'En cola',
-    groupWorking: 'El grupo está trabajando…'
+    groupWorking: 'El grupo está trabajando…',
+    silentRound: 'Nadie respondió — menciona a alguien con @ si necesitas una respuesta.',
+    composerPlaceholder: 'Mensaje al grupo…'
   }
 } satisfies Record<string, CanonicalGroupMessages>

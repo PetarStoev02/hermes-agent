@@ -38,11 +38,13 @@ import {
   PaneTabStrip
 } from '@/components/ui/pane-tab'
 import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
+import { Slot } from '@/contrib/react/slot'
 import { useContributions } from '@/contrib/react/use-contributions'
 import { useI18n } from '@/i18n'
 import { useKeybindHint } from '@/lib/keybinds/use-keybind-hint'
 import { isBrowserOwnedTouch } from '@/lib/touch-interaction'
 import { cn } from '@/lib/utils'
+import { TITLEBAR_AREAS } from '@/sdk/areas'
 import { closeAllOpenSessionTiles, setZoneParkedTiles } from '@/store/session-states'
 
 import { $layoutEditMode, $layoutEditRevealsHidden } from '../../edit-mode'
@@ -360,7 +362,8 @@ export function TreeGroup({
   node,
   parentAxis,
   railSide = 'left',
-  topEdge = false
+  topEdge = false,
+  leftEdge = false
 }: {
   node: GroupNode
   parentAxis?: 'column' | 'row'
@@ -926,6 +929,17 @@ export function TreeGroup({
                 width: headerVisible && tabsInTitlebar ? TITLEBAR_DRAG_HANDLE_WIDTH : undefined
               }}
             />
+          )}
+          {/* Trailing tools on the traffic-light row at the end of the left
+              sidebar (search / New…), above any tab strip that sits below. */}
+          {topEdge && leftEdge && (
+            <div
+              className="flex shrink-0 items-center self-start [-webkit-app-region:no-drag]"
+              data-panel-titlebar-end=""
+              style={{ height: titlebarHeight }}
+            >
+              <Slot area={TITLEBAR_AREAS.sidebarEnd} />
+            </div>
           )}
           {topEdge && (
             <div aria-hidden="true" className="shrink-0" style={{ width: 'var(--panel-titlebar-right, 0px)' }} />

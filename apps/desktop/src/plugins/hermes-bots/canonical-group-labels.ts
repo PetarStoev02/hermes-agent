@@ -26,6 +26,7 @@ export function useCanonicalGroupLabels() {
     disbanded: group.disbanded,
     disbandDescPrefix: group.disbandDescPrefix,
     disbandDescSuffix: group.disbandDescSuffix,
-    disbandTitle: group.disbandTitle
+    disbandTitle: group.disbandTitle,
+    you: group.you
   }
 }

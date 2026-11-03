@@ -661,6 +661,8 @@ export function groupRowsBySection<TRow extends { bot?: RosterRow } | RosterRow>
 export interface VisibleBlocksOptions {
   /** Whether the block with this section id is folded. */
   collapsed: (id: string) => boolean
+  /** Search or filter is narrowing the roster — hide empty folders. */
+  constrained?: boolean
   /** The roster drag key in flight, if any. */
   dragging: null | string
   /** Drawn inside a gateway bucket. */
@@ -672,24 +674,27 @@ export interface VisibleBlocksOptions {
  * Unassigned is not worth a heading — except while a FOLDER is dragged, when
  * it is the "end of the top level" drop target. An empty NAMED section is,
  * because it is somewhere the user made and is about to drop into; inside a
- * gateway bucket the same empty section would repeat under every connection,
- * so there it only appears while a drag is in flight. A folder counts as
- * non-empty when anything below it is. Blocks arrive depth-first, so a
- * collapsed (or hidden) folder hides its subtree by hiding every block whose
- * parent is hidden or collapsed.
+ * gateway bucket (or while search/filter is active) the same empty section
+ * would just be noise, so there it only appears while a drag is in flight. A
+ * folder counts as non-empty when anything below it is. Blocks arrive
+ * depth-first, so a collapsed (or hidden) folder hides its subtree by hiding
+ * every block whose parent is hidden or collapsed.
  */
 export function visibleSectionBlocks<TRow>(
   blocks: SectionBlock<TRow>[],
-  { collapsed, dragging, nested }: VisibleBlocksOptions
+  { collapsed, constrained = false, dragging, nested }: VisibleBlocksOptions
 ): SectionBlock<TRow>[] {
   const hidden = new Set<string>()
   const sorting = Boolean(dragging?.startsWith(SECTION_DRAG_PREFIX))
   // Bot or pin-grid drag: keep empty Unassigned visible so a pin can land
   // there to unpin. Folder sorts still use `sorting` alone for that slot.
   const filing = Boolean(dragging) && !sorting
+  // Empty named folders stay as drop targets only when the list is the full
+  // roster; search/filter and gateway nesting both suppress them until a drag.
+  const keepEmptyNamed = !nested && !constrained
 
   return blocks.filter(block => {
-    const wanted = block.id ? !nested || Boolean(dragging) : sorting || filing
+    const wanted = block.id ? keepEmptyNamed || Boolean(dragging) : sorting || filing
     const visible = !(block.parentId && hidden.has(block.parentId)) && Boolean(block.total || wanted)
 
     if (block.id && (!visible || collapsed(block.id))) {

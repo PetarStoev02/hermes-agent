@@ -1,15 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { applyBotsFirstSidebar, BOTS_PANE_ID, SESSIONS_PANE_ID, startBotsFirstSidebar } from './bots-first-sidebar'
+import {
+  applyBotsFirstSidebar,
+  BOTS_PANE_ID,
+  SESSIONS_PANE_ID,
+  startBotsFirstSidebar,
+  TERMINAL_PANE_ID
+} from './bots-first-sidebar'
 
 describe('applyBotsFirstSidebar', () => {
-  it('fronts Bots then hides the Sessions strip tab', () => {
+  it('fronts Bots then hides the Sessions and Terminal strip tabs', () => {
     const revealPane = vi.fn()
     const setStripTabHidden = vi.fn(() => true)
 
     expect(applyBotsFirstSidebar({ revealPane, setStripTabHidden })).toBe(true)
     expect(revealPane).toHaveBeenCalledWith(BOTS_PANE_ID)
     expect(setStripTabHidden).toHaveBeenCalledWith(SESSIONS_PANE_ID, true)
+    expect(setStripTabHidden).toHaveBeenCalledWith(TERMINAL_PANE_ID, true)
   })
 
   it('still fronts Bots when the host cannot hide strip tabs', () => {

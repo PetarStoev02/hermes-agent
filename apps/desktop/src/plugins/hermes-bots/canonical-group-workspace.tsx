@@ -1,4 +1,4 @@
-import { Button, host, randomUuid } from '@hermes/plugin-sdk'
+import { Button, Codicon, host, randomUuid } from '@hermes/plugin-sdk'
 import { type ClipboardEvent, type DragEvent, useEffect, useRef, useState } from 'react'
 
 import { type CanonicalDriverActivity, CanonicalGroupWorkingLine, canonicalMemberPhases } from './canonical-group-activity'
@@ -6,7 +6,7 @@ import { CanonicalGroupAttachments, type CanonicalGroupUploader } from './canoni
 import { CanonicalGroupHeader } from './canonical-group-header'
 import { type CanonicalGroupEvent, CanonicalGroupHistory } from './canonical-group-history'
 import { useCanonicalGroupLabels } from './canonical-group-labels'
-import { forgetCanonicalGroup } from './canonical-group-registry'
+import { forgetCanonicalGroup, remirrorCanonicalRoomRename } from './canonical-group-registry'
 import { prepareCanonicalGroupSend, readCanonicalGroupSend, retireCanonicalGroupSend } from './canonical-group-send'
 import type { PreparedCanonicalGroupSend } from './canonical-group-send'
 import { actCanonicalGroup, canonicalGroupRequest } from './canonical-groups'
@@ -163,8 +163,23 @@ function CanonicalRoomView({ binding: initialBinding, visible, onBack }: {
   const act = (action: CanonicalPendingAction, choice?: 'once' | 'deny') =>
     mutate(() => actCanonicalGroup(binding, action, choice))
 
-  const rename = (name: string) =>
-    void mutate(() => canonicalGroupRequest(binding, 'groups.rename', { room_id: binding.roomId, event_id: randomUuid(), name }))
+  const rename = (name: string) => {
+    const previousName = state?.room.name || binding.roomName
+    void mutate(async () => {
+      await canonicalGroupRequest(binding, 'groups.rename', { room_id: binding.roomId, event_id: randomUuid(), name })
+      // groups.state after rename is the settle path; remirror here so the folder
+      // GroupRow re-keys even before the next discover tick.
+      const snapshot = await canonicalGroupRequest<RoomState>(binding, 'groups.state', { room_id: binding.roomId })
+
+      if (snapshot?.room) {
+        remirrorCanonicalRoomRename(
+          { connectionId: binding.connectionId, profile: binding.profile },
+          snapshot.room,
+          previousName
+        )
+      }
+    })
+  }
 
   // Rejects so ConfirmDialog stays open with the error; a disbanded room no longer reads back, so leave it.
   const end = async () => {
@@ -189,8 +204,8 @@ function CanonicalRoomView({ binding: initialBinding, visible, onBack }: {
     if (!composerLocked) {uploader.current?.upload(files)}
   }
 
-  return <section className="flex h-full min-h-0 flex-col gap-3 p-3">
-    <CanonicalGroupHeader busy={busy} canStop={!!state?.driver_status} onBack={onBack} onDisband={end} onRename={rename}
+  return <section className="relative flex h-full min-h-0 flex-col gap-3 p-3">
+    <CanonicalGroupHeader binding={binding} busy={busy} canStop={!!state?.driver_status} onBack={onBack} onDisband={end} onRename={rename}
       onStop={() => void mutate(() => canonicalGroupRequest(binding, 'groups.stop', { room_id: binding.roomId, cancel_id: randomUuid() }))} phases={phases} room={state?.room} />
     {readError && <div role="alert">{readError}<Button onClick={() => void refresh().catch(e => setReadError(String(e)))}>{labels.refresh}</Button></div>}
     {error && <div role="alert">{error}</div>}
@@ -211,12 +226,34 @@ function CanonicalRoomView({ binding: initialBinding, visible, onBack }: {
       <Button onClick={() => setDiscard(null)}>{labels.cancel}</Button>
     </div>}
     {restoredPending && <p role="status">{labels.restoredPendingSend}</p>}
-    <form className="flex gap-2" onDragOver={event => { if (event.dataTransfer.types.includes('Files')) {event.preventDefault()} }}
-      onDrop={event => attachTransfer(event, event.dataTransfer)} onPaste={event => attachTransfer(event, event.clipboardData)} onSubmit={event => { event.preventDefault(); send() }}>
+    <form
+      className="flex items-end gap-1 rounded-2xl border border-(--stroke-nous) bg-(--ui-widget-surface-background) p-1.5 shadow-nous"
+      onDragOver={event => { if (event.dataTransfer.types.includes('Files')) {event.preventDefault()} }}
+      onDrop={event => attachTransfer(event, event.dataTransfer)}
+      onPaste={event => attachTransfer(event, event.clipboardData)}
+      onSubmit={event => { event.preventDefault(); send() }}
+    >
       <CanonicalGroupAttachments attachments={attachments} binding={binding} disabled={composerLocked} onChange={setAttachments} onUploadingChange={setUploading} ref={uploader} />
-      <GroupMentionInput aria-label={labels.groupMessage} className="min-w-0 flex-1" disabled={composerLocked} handleFor={member => member.handle}
-        members={mentionMembers} onChange={setDraft} onSubmitDraft={send} value={draft} />
-      <Button disabled={!restored || busy || uploading || (!pending && !draft.trim() && !attachments.length) || !state?.driver_status} type="submit">{pending ? labels.retry : labels.send}</Button>
+      <GroupMentionInput
+        aria-label={labels.groupMessage}
+        className="min-w-0 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+        disabled={composerLocked}
+        handleFor={member => member.handle}
+        members={mentionMembers}
+        onChange={setDraft}
+        onSubmitDraft={send}
+        placeholder={labels.composerPlaceholder}
+        value={draft}
+      />
+      <Button
+        aria-label={pending ? labels.retry : labels.send}
+        className="shrink-0 rounded-full"
+        disabled={!restored || busy || uploading || (!pending && !draft.trim() && !attachments.length) || !state?.driver_status}
+        size="icon"
+        type="submit"
+      >
+        {pending ? labels.retry : <Codicon name="arrow-up" />}
+      </Button>
     </form>
   </section>
 }

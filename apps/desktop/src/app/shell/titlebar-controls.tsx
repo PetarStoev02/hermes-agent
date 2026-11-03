@@ -9,6 +9,7 @@ import { toggleLayoutEditMode } from '@/components/pane-shell/edit-mode'
 import { $narrowOverlayPaneIds } from '@/components/pane-shell/narrow-overlay-state'
 import { $narrowViewport } from '@/components/pane-shell/tree/store'
 import { resetLayoutTree } from '@/components/pane-shell/tree/store'
+import { $workspaceMode } from '@/components/pane-shell/workspace-scope'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
@@ -192,11 +193,15 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const unreadCount = useStore($unreadSessionCount)
   const appActionsSide = useStore($titlebarAppActionsSide)
   const interfaceMode = useStore($interfaceMode)
+  const workspaceMode = useStore($workspaceMode)
   const unreadBadge = unreadCount > 0 ? unreadCount : undefined
   const unreadHint = unreadBadge ? ` · ${t.titlebar.unreadSessions(unreadBadge)}` : ''
   // One filter for every cluster: a tool's own `hidden`, then the mode's tier.
   const shown = shownInMode(interfaceMode)
   const visibleTool = (tool: TitlebarTool) => !tool.hidden && shown(tool)
+  // Bot Mode keeps the roster up (Grok-style); hide-sidebar leaves an empty
+  // left cluster beside search/New — drop it and leave those on the right.
+  const hideSidebarToggle = workspaceMode === 'bots'
 
   // `titleBar.*` slot content is mount-scoped — a page's <Contribute> registers
   // only while that surface is up — so a non-empty area means a page is
@@ -219,6 +224,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
     ...TITLEBAR_FIXED_TOOLS.sidebar,
     actionId: 'view.toggleSidebar',
     badge: panesFlipped ? undefined : unreadBadge,
+    hidden: hideSidebarToggle,
     icon: <TitlebarIcon name="layout-sidebar-left" />,
     id: 'sidebar',
     expanded: leftEdge.expanded,

@@ -463,6 +463,14 @@ export async function pluginSdkMock(host: Record<string, unknown>) {
   const { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } =
     await import('@/components/ui/context-menu')
 
+  const {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+  } = await import('@/components/ui/dropdown-menu')
+
   return {
     Textarea,
     ContextMenu,
@@ -470,6 +478,15 @@ export async function pluginSdkMock(host: Record<string, unknown>) {
     ContextMenuItem,
     ContextMenuSeparator,
     ContextMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    // GroupAvatarCluster's empty-member fallback (organization glyph).
+    Codicon: () => null,
+    // botAppearance → GroupAvatarCluster faces in the agent-style group header.
+    profileColor: () => '#6b7280',
     cn,
     // Real value: approval.respond forwards it as its client deadline (#60654).
     APPROVAL_RESPOND_TIMEOUT_MS: 300_000,
