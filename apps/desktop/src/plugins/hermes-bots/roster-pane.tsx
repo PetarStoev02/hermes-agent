@@ -33,6 +33,7 @@ import {
   sourceByConnection,
   useRoster
 } from './data'
+import { openBotDetailsFor } from './details-panel-state'
 import { $groupChats, $groupChatWorkspace, $groupClarify, $groupNeedsYou } from './group-chat'
 import { GroupChatWorkspace, openGroupChat } from './group-chat-view'
 import { groupChatMemberBots } from './group-membership'
@@ -242,7 +243,6 @@ export function BotsPane() {
   const activeConnectionId = host.state.connectionId?.get?.() || 'local'
   const [createOpen, setCreateOpen] = useState(false)
   const [groupCreateOpen, setGroupCreateOpen] = useState(false)
-  const [editing, setEditing] = useState<null | RosterRow>(null)
   // `path` is the profile directory the gateway reports on a profiles.list row;
   // it is not part of the shared RosterRow model, so it rides as an extra here.
   const [deleting, setDeleting] = useState<null | (RosterRow & { path?: string })>(null)
@@ -431,7 +431,7 @@ export function BotsPane() {
       bot={bot}
       key={`${keyPrefix}${botRosterKey(bot)}`}
       onDelete={setDeleting}
-      onEdit={setEditing}
+      onEdit={bot => openBotDetailsFor(bot)}
       onGroup={setGrouping}
       onNewSection={target => setSectionDialog({ bot: target, mode: 'create' })}
       showHandle={botNeedsHandleLabel(bot, roster, allMeta)}
@@ -521,7 +521,7 @@ export function BotsPane() {
         hiddenBots,
         showHiddenRows,
         hiddenGatewaySections,
-        onEditPinned: setEditing,
+        onEditPinned: bot => openBotDetailsFor(bot),
         renderBotRow,
         renderGroupChatSection,
         renderGatewaySection,
@@ -536,8 +536,6 @@ export function BotsPane() {
         setCreateOpen,
         groupCreateOpen,
         setGroupCreateOpen,
-        editing,
-        setEditing,
         deleting,
         setDeleting,
         deletingGroup,

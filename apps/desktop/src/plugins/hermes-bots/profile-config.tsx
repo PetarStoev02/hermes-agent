@@ -18,7 +18,7 @@ import {
   surfaceModelSwitchConfirm,
   Textarea
 } from '@hermes/plugin-sdk'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 
 import { $lastRoster, ROSTER_KEY } from './data'
 import { labeled, ResizableFrame } from './dialog-parts'
@@ -122,13 +122,95 @@ interface AdvancedConfigState {
   soul: string
   toolsets: CapabilityEntry[]
 }
+export type AdvancedProfileSections = {
+  /** Skills / tools / connectors / MCP browser. Default true. */
+  capabilities?: boolean
+  /** Provider + model picker. Default true. */
+  model?: boolean
+  /** SOUL.md editor. Default true. */
+  soul?: boolean
+}
+
 interface AdvancedProfileConfigProps {
   bot: RosterRow
+  /** Which blocks to render. Omitted keys default to true (create dialog / legacy). */
+  sections?: AdvancedProfileSections
   setState: (update: (prev: AdvancedConfigState) => AdvancedConfigState) => void
   state: AdvancedConfigState
 }
 
-export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileConfigProps) {
+function sectionOn(sections: AdvancedProfileSections | undefined, key: keyof AdvancedProfileSections): boolean {
+  return sections?.[key] !== false
+}
+
+function AdvancedModelField({
+  bot,
+  setState,
+  show,
+  state
+}: {
+  bot: RosterRow
+  setState: AdvancedProfileConfigProps['setState']
+  show: boolean
+  state: AdvancedConfigState
+}) {
+  if (!show) {
+    return null
+  }
+
+  return (
+    <ModelPicker
+      bot={bot}
+      onChange={patch =>
+        setState(prev => ({
+          ...prev,
+          dirtyModel: true,
+          ...patch
+        }))
+      }
+      value={{
+        provider: state.provider,
+        model: state.model
+      }}
+    />
+  )
+}
+
+function AdvancedSoulField({
+  label,
+  setState,
+  show,
+  state
+}: {
+  label: string
+  setState: AdvancedProfileConfigProps['setState']
+  show: boolean
+  state: AdvancedConfigState
+}) {
+  if (!show) {
+    return null
+  }
+
+  return labeled(
+    label,
+    <Textarea
+      className="min-h-28 font-mono text-xs leading-5"
+      onChange={event =>
+        setState(prev => ({
+          ...prev,
+          dirtySoul: true,
+          soul: event.target.value
+        }))
+      }
+      value={state.soul}
+    />
+  )
+}
+
+export function AdvancedProfileConfig({ bot, sections, state, setState }: AdvancedProfileConfigProps) {
+  const showModel = sectionOn(sections, 'model')
+  const showCapabilities = sectionOn(sections, 'capabilities')
+  const showSoul = sectionOn(sections, 'soul')
   const b = useBots()
   const [loaded, setLoaded] = useState(false)
   const [unsupported, setUnsupported] = useState(false)
@@ -244,6 +326,14 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
   const enabledToolsets = state.toolsets.filter(t => t.enabled).length
   const mcpList = state.mcp || []
 
+  const shell = (capabilities: ReactNode) => (
+    <div className="grid gap-4">
+      <AdvancedModelField bot={bot} setState={setState} show={showModel} state={state} />
+      {capabilities}
+      <AdvancedSoulField label={b.editor.editSoul} setState={setState} show={showSoul} state={state} />
+    </div>
+  )
+
   // Newer desktop builds export the WHOLE core Capabilities surface
   // (hermes-agent#87317): Skills (installed list + one-click hub installs +
   // full-skill detail), Tools (per-toolset config), and MCP — pinned to this
@@ -251,116 +341,150 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
   // Render THAT instead of the checkbox stand-ins; writes go straight to the
   // bot's backend, so the dirty-section staging below only carries
   // model + SOUL on these builds. Older builds keep the full checklist UI.
-  if (CapabilitiesView && (!botRoute || capabilitiesViewRoutesConnections)) {
-    return (
-      <div className="grid gap-4">
-        <ModelPicker
-          bot={bot}
-          onChange={patch =>
-            setState(prev => ({
-              ...prev,
-              dirtyModel: true,
-              ...patch
-            }))
-          }
-          value={{
-            provider: state.provider,
-            model: state.model
-          }}
-        />
-        {labeled(
-          b.editor.liveCapabilities,
-          <ResizableFrame>
-            <CapabilitiesView
-              embedded
-              fixedProfile={backendProfile}
-              {...(botRoute
-                ? {
-                    fixedConnection: botRoute.connectionId
-                  }
-                : {})}
-            />
-          </ResizableFrame>
-        )}
-        {labeled(
-          b.editor.editSoul,
-          <Textarea
-            className="min-h-28 font-mono text-xs leading-5"
-            onChange={event =>
-              setState(prev => ({
-                ...prev,
-                dirtySoul: true,
-                soul: event.target.value
-              }))
-            }
-            value={state.soul}
-          />
-        )}
-      </div>
+  const useLiveCapabilities = Boolean(CapabilitiesView && (!botRoute || capabilitiesViewRoutesConnections))
+  const useRemoteHint = Boolean(bot?.sourceScoped && botRoute?.mode === 'remote' && !capabilitiesViewRoutesConnections)
+
+  if (useLiveCapabilities) {
+    return shell(
+      <LiveCapabilitiesBlock
+        backendProfile={backendProfile}
+        botRoute={botRoute}
+        label={b.editor.liveCapabilities}
+        show={showCapabilities}
+      />
     )
   }
 
-  if (bot?.sourceScoped && botRoute?.mode === 'remote' && !capabilitiesViewRoutesConnections) {
-    return (
-      <div className="grid gap-4">
-        <ModelPicker
-          bot={bot}
-          onChange={patch =>
-            setState(prev => ({
-              ...prev,
-              dirtyModel: true,
-              ...patch
-            }))
-          }
-          value={{
-            provider: state.provider,
-            model: state.model
-          }}
-        />
-        <div className="rounded-md border border-(--ui-stroke-secondary) px-3 py-2 text-xs text-(--ui-text-tertiary)">
-          {b.editor.remoteCapabilitiesHint}
-        </div>
-        {labeled(
-          b.editor.editSoul,
-          <Textarea
-            className="min-h-28 font-mono text-xs leading-5"
-            onChange={event =>
-              setState(prev => ({
-                ...prev,
-                dirtySoul: true,
-                soul: event.target.value
-              }))
+  if (useRemoteHint) {
+    return shell(<RemoteCapabilitiesHint hint={b.editor.remoteCapabilitiesHint} show={showCapabilities} />)
+  }
+
+  return shell(
+    <ChecklistCapabilitiesBlock
+      backendScope={backendScope}
+      bot={bot}
+      catalogInstalled={b.editor.catalogInstalled}
+      catalogLabel={b.editor.catalog}
+      enabledSkills={enabledSkills}
+      enabledToolsets={enabledToolsets}
+      filterPlaceholder={b.tools.filterSkills}
+      mcpLabel={b.editor.mcpServers}
+      mcpList={mcpList}
+      noMcp={b.tools.noMcpServers}
+      setSkillFilter={setSkillFilter}
+      setState={setState}
+      show={showCapabilities}
+      skillFilter={skillFilter}
+      skillsLabel={b.editor.skillsEnabled(enabledSkills, state.skills.length)}
+      state={state}
+      toggleMcp={toggleMcp}
+      toggleSkill={toggleSkill}
+      toggleToolset={toggleToolset}
+      toolsetsLabel={b.editor.toolsetsEnabled(enabledToolsets, state.toolsets.length)}
+      visibleSkills={visibleSkills}
+    />
+  )
+}
+
+function LiveCapabilitiesBlock({
+  backendProfile,
+  botRoute,
+  label,
+  show
+}: {
+  backendProfile: string
+  botRoute: ReturnType<typeof resolveBotConnectionRoute>['route']
+  label: string
+  show: boolean
+}) {
+  if (!show || !CapabilitiesView) {
+    return null
+  }
+
+  return labeled(
+    label,
+    <ResizableFrame>
+      <CapabilitiesView
+        embedded
+        fixedProfile={backendProfile}
+        {...(botRoute
+          ? {
+              fixedConnection: botRoute.connectionId
             }
-            value={state.soul}
-          />
-        )}
-      </div>
-    )
+          : {})}
+      />
+    </ResizableFrame>
+  )
+}
+
+function RemoteCapabilitiesHint({ hint, show }: { hint: string; show: boolean }) {
+  if (!show) {
+    return null
   }
 
   return (
-    <div className="grid gap-4">
-      <ModelPicker
-        bot={bot}
-        onChange={patch =>
-          setState(prev => ({
-            ...prev,
-            dirtyModel: true,
-            ...patch
-          }))
-        }
-        value={{
-          provider: state.provider,
-          model: state.model
-        }}
-      />
+    <div className="rounded-md border border-(--ui-stroke-secondary) px-3 py-2 text-xs text-(--ui-text-tertiary)">
+      {hint}
+    </div>
+  )
+}
+
+function ChecklistCapabilitiesBlock({
+  backendScope,
+  bot,
+  catalogInstalled,
+  catalogLabel,
+  filterPlaceholder,
+  mcpLabel,
+  mcpList,
+  noMcp,
+  setSkillFilter,
+  setState,
+  show,
+  skillFilter,
+  skillsLabel,
+  state,
+  toggleMcp,
+  toggleSkill,
+  toggleToolset,
+  toolsetsLabel,
+  visibleSkills
+}: {
+  backendScope: string
+  bot: RosterRow
+  catalogInstalled: string
+  catalogLabel: string
+  enabledSkills: number
+  enabledToolsets: number
+  filterPlaceholder: string
+  mcpLabel: string
+  mcpList: NonNullable<AdvancedConfigState['mcp']>
+  noMcp: string
+  setSkillFilter: (value: string) => void
+  setState: AdvancedProfileConfigProps['setState']
+  show: boolean
+  skillFilter: string
+  skillsLabel: string
+  state: AdvancedConfigState
+  toggleMcp: (name: string, enabled: boolean) => void
+  toggleSkill: (name: string, enabled: boolean) => void
+  toggleToolset: (name: string, enabled: boolean) => void
+  toolsetsLabel: string
+  visibleSkills: CapabilityEntry[]
+}) {
+  if (!show) {
+    return null
+  }
+
+  return (
+    <>
       {labeled(
-        b.editor.skillsEnabled(enabledSkills, state.skills.length),
+        skillsLabel,
         <div className="grid gap-1.5 rounded-md border border-(--ui-stroke-secondary) p-2">
           <Input
             className="h-7 text-xs"
             onChange={event => setSkillFilter(event.target.value)}
-            placeholder={b.tools.filterSkills}
+            placeholder={filterPlaceholder}
             value={skillFilter}
           />
           <div
@@ -393,7 +517,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
         </div>
       )}
       {labeled(
-        b.editor.toolsetsEnabled(enabledToolsets, state.toolsets.length),
+        toolsetsLabel,
         <div className="rounded-md border border-(--ui-stroke-secondary) p-2">
           <div
             className="overflow-y-auto overscroll-contain"
@@ -411,9 +535,6 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
                     />
                     <span>{tset.name}</span>
                   </label>
-                  {/* The REAL per-toolset config (env vars / API keys / model */
-                  /* picker / post-setup), scoped to THIS bot's profile, when */
-                  /* the desktop build exposes it. Older builds: just the toggle. */}
                   {ToolsetConfigPanel ? (
                     <div className="mt-1.5 border-t border-(--ui-stroke-secondary) pt-1.5">
                       <ToolsetConfigPanel profile={backendScope} toolset={tset.name} />
@@ -426,7 +547,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
         </div>
       )}
       {labeled(
-        b.editor.mcpServers,
+        mcpLabel,
         <div className="overflow-hidden rounded-md border border-(--ui-stroke-secondary)">
           {ConnectorsTab && typeof host.getGateway === 'function' ? (
             <div
@@ -439,7 +560,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
               <ConnectorsTab gateway={host.getGateway()} profile={backendScope} />
             </div>
           ) : mcpList.length === 0 ? (
-            <div className="px-1 py-2 text-center text-xs text-(--ui-text-tertiary)">{b.tools.noMcpServers}</div>
+            <div className="px-1 py-2 text-center text-xs text-(--ui-text-tertiary)">{noMcp}</div>
           ) : (
             <div
               className="overflow-y-auto overscroll-contain"
@@ -465,7 +586,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
                         <span>{m.name}</span>
                         {m.fromCatalog && !needsSetup ? (
                           <span className="ml-1.5 text-[0.65rem] text-(--ui-text-quaternary)">
-                            {m.installed ? b.editor.catalogInstalled : b.editor.catalog}
+                            {m.installed ? catalogInstalled : catalogLabel}
                           </span>
                         ) : null}
                         {needsSetup ? (
@@ -485,21 +606,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
           )}
         </div>
       )}
-      {labeled(
-        b.editor.editSoul,
-        <Textarea
-          className="min-h-28 font-mono text-xs leading-5"
-          onChange={event =>
-            setState(prev => ({
-              ...prev,
-              dirtySoul: true,
-              soul: event.target.value
-            }))
-          }
-          value={state.soul}
-        />
-      )}
-    </div>
+    </>
   )
 }
 

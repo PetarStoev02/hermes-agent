@@ -28,6 +28,7 @@ import {
 import type { ChatChromeProps, ChatEmptyProps, PluginContext, ProfileGroupRoute } from '@hermes/plugin-sdk'
 
 import { startFaceClock, stopFaceClock } from './avatar'
+import { BotDetailsPanel } from './bot-details-panel'
 import { BotNamePill } from './bot-name-pill'
 import {
   $botChatFocused,
@@ -735,12 +736,17 @@ export default {
       }
     })
 
-    // Floating name pill over every Bot Mode chat — toggles the details panel.
+    // Floating name pill + right details panel over every Bot Mode chat.
     ctx.register({
       id: 'chat-name-pill',
       area: CHAT_CHROME_AREA,
       data: {
-        render: (_props: ChatChromeProps) => <BotNamePill />
+        render: (_props: ChatChromeProps) => (
+          <>
+            <BotNamePill />
+            <BotDetailsPanel />
+          </>
+        )
       }
     })
 

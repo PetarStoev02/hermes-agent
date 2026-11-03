@@ -182,6 +182,12 @@ const en: BotsMessages = {
     topLevel: 'Top level',
     undo: 'Undo'
   },
+  detailsPanel: {
+    details: 'Details',
+    look: 'Look',
+    capabilities: 'Capabilities',
+    soul: 'Soul'
+  },
   bot: {
     newTitle: 'New bot',
     editTitle: 'Edit profile',
@@ -631,6 +637,12 @@ const ja: BotsMessages = {
     topLevel: '最上位',
     undo: '元に戻す'
   },
+  detailsPanel: {
+    details: '詳細',
+    look: '見た目',
+    capabilities: '機能',
+    soul: 'Soul'
+  },
   bot: {
     newTitle: '新しいボット',
     editTitle: 'プロファイルを編集',
@@ -1073,6 +1085,12 @@ const zh: BotsMessages = {
     topLevel: '顶层',
     undo: '撤销'
   },
+  detailsPanel: {
+    details: '详情',
+    look: '外观',
+    capabilities: '能力',
+    soul: 'Soul'
+  },
   bot: {
     newTitle: '新建机器人',
     editTitle: '编辑配置档案',
@@ -1507,6 +1525,12 @@ const zhHant: BotsMessages = {
     moveInto: '將分區移至',
     topLevel: '最上層',
     undo: '復原'
+  },
+  detailsPanel: {
+    details: '詳細資料',
+    look: '外觀',
+    capabilities: '功能',
+    soul: 'Soul'
   },
   bot: {
     newTitle: '新增機器人',

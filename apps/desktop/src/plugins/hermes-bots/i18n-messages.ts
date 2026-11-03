@@ -140,6 +140,13 @@ export type BotsMessages = {
     topLevel: string
     undo: string
   }
+  /** Right-side details panel tabs (replaces Edit Profile dialog). */
+  detailsPanel: {
+    details: string
+    look: string
+    capabilities: string
+    soul: string
+  }
   /** Creating, editing and removing a bot. */
   bot: {
     newTitle: string
