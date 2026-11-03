@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { createContext, memo, useCallback, useContext, useMemo, useRef, useState } from 'react'
 
+import { ChatChromeSlot } from '@/components/assistant-ui/chat-chrome-slot'
 import { ChatEmptySlot } from '@/components/assistant-ui/chat-empty-slot'
 import { AssistantMessage } from '@/components/assistant-ui/thread/assistant-message'
 import { ThreadMessageList } from '@/components/assistant-ui/thread/list'
@@ -191,6 +192,7 @@ export const Thread = memo(function Thread({
       >
         {!signedOut && (
           <>
+            {sessionId ? <ChatChromeSlot sessionId={sessionId} /> : null}
             <ThreadMessageList
               clampToComposer={clampToComposer}
               components={messageComponents}

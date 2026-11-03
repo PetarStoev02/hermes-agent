@@ -211,7 +211,10 @@ const TimelineMarkdownText: FC<TimelineTextPartProps> = ({ completedAt, timestam
   return (
     <>
       <TimelineTimestamp className="mb-0.5 block" completedAt={completedAt} timestamp={timestamp} />
-      <MarkdownText />
+      {/* Soft Grok-style bubble around assistant prose only — tools stay outside. */}
+      <div className="max-w-[min(100%,36rem)] rounded-2xl bg-(--ui-bg-quaternary) px-3.5 py-2.5">
+        <MarkdownText />
+      </div>
     </>
   )
 }

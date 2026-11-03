@@ -16,6 +16,7 @@
  */
 
 import {
+  CHAT_CHROME_AREA,
   CHAT_EMPTY_AREA,
   COMPOSER_AREAS,
   host,
@@ -24,9 +25,10 @@ import {
   SIDEBAR_PROFILE_GROUP_HEADER_AREA,
   translateNow
 } from '@hermes/plugin-sdk'
-import type { ChatEmptyProps, PluginContext, ProfileGroupRoute } from '@hermes/plugin-sdk'
+import type { ChatChromeProps, ChatEmptyProps, PluginContext, ProfileGroupRoute } from '@hermes/plugin-sdk'
 
 import { startFaceClock, stopFaceClock } from './avatar'
+import { BotNamePill } from './bot-name-pill'
 import {
   $botChatFocused,
   $botsPaneVisible,
@@ -730,6 +732,15 @@ export default {
       area: CHAT_EMPTY_AREA,
       data: {
         render: ({ sessionId }: ChatEmptyProps) => <BotChatEmpty sessionId={sessionId} />
+      }
+    })
+
+    // Floating name pill over every Bot Mode chat — toggles the details panel.
+    ctx.register({
+      id: 'chat-name-pill',
+      area: CHAT_CHROME_AREA,
+      data: {
+        render: (_props: ChatChromeProps) => <BotNamePill />
       }
     })
 

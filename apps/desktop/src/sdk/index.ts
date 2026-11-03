@@ -1816,6 +1816,8 @@ export {
 export { type BudgetedLoop, type BudgetedLoopOptions, createBudgetedLoop } from '@/lib/budgeted-loop'
 /** The blank transcript as a contribution area: claim the sessions you own and
  *  render what stands in the gap. Core's own splash keeps a fresh draft. */
+/** Floating chrome over a live chat (Bot Mode name pill, etc.). */
+export { CHAT_CHROME_AREA, type ChatChromeContribution, type ChatChromeProps } from '@/lib/chat-chrome'
 export { CHAT_EMPTY_AREA, type ChatEmptyContribution, type ChatEmptyProps } from '@/lib/chat-empty'
 /** THE copy-to-clipboard path (CopyButton's): Electron's IPC first, the Clipboard API, and a
  *  selection copy where an insecure origin has no Clipboard API. Never call
